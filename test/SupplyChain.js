@@ -14,7 +14,7 @@ describe("SupplyChain", function () {
 
   it("should register users", async function () {
     await supplyChain.connect(manufacturer).registerUser("Manu1", 0); // Manufacturer
-    const user = await supplyChain.getUser(manufacturer.address);
+    const user = await supplyChain.returnUserInfo(manufacturer.address);
     expect(user.name).to.equal("Manu1");
   });
 
@@ -22,9 +22,9 @@ describe("SupplyChain", function () {
     await supplyChain.connect(manufacturer).registerUser("Manu1", 0);
     await supplyChain.connect(vendor).registerUser("Vendor1", 2);
 
-    await supplyChain.connect(manufacturer).createProduct("Laptop", "Manu1", "ABC123", "2025-09-25");
+    await supplyChain.connect(manufacturer).registerProduct("Laptop", "Manu1", "ABC123", "2025-09-25");
 
-    await supplyChain.connect(manufacturer).transferProduct(vendor.address, "ABC123");
+    await supplyChain.connect(manufacturer).sellProduct(vendor.address, "ABC123");
 
     const history = await supplyChain.products().productHistory("ABC123", 1);
     expect(history.owner).to.equal(vendor.address);
