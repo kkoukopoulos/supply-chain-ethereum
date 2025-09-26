@@ -17,11 +17,11 @@ contract SupplyChain {
     }
 
     function registerUser(string memory _name,Types.UserRole _role) public {
-        Users.addUser(_name, _role);
+        users.addUser(_name, _role);
     }
 
     function returnUserInfo(address _addr) external view returns (string memory name, Types.UserRole role) {
-        Users.getUserInfo(_addr);
+        users.getUserInfo(_addr);
     }
 
     function returnUser(address _addr) external view returns (Types.User memory) {

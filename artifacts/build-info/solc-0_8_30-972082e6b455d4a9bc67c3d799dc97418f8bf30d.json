@@ -1,0 +1,47 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_30-972082e6b455d4a9bc67c3d799dc97418f8bf30d",
+  "solcVersion": "0.8.30",
+  "solcLongVersion": "0.8.30+commit.73712a01",
+  "userSourceNameMap": {
+    "contracts/Products.sol": "project/contracts/Products.sol",
+    "contracts/SupplyChain.sol": "project/contracts/SupplyChain.sol",
+    "contracts/Types.sol": "project/contracts/Types.sol",
+    "contracts/Users.sol": "project/contracts/Users.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "prague",
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/Products.sol": {
+        "content": "// SPDX-License-Identifier: UNLICENSED\npragma solidity 0.8.30;\n\nimport \"./Types.sol\";\nimport \"./Users.sol\";\n\ncontract Products {\n    Users public users;\n    Types.Product[] public products;\n    mapping(address => string[]) public userProducts;\n    mapping(string => Types.ProductHistory[]) public productHistory;\n\n    event NewProduct(\n        string name,\n        string manufacturerName,\n        string barcode,\n        string manufacturedTime\n    );\n\n    event ProductOwnershipTransfer(\n        string name,\n        string manufacturerName,\n        string barcode,\n        string buyerName,\n        string sellerName,\n        uint256 transferTime\n    );\n\n    modifier onlyManufacturer() {\n        Types.User memory usr = users.getUser(msg.sender);\n        require(usr.role == Types.UserRole.Manufacturer, \"Only manufacturer can add products.\");\n        _;\n    }\n\n    // link with Users contract\n    function setUsersContract(address _users) public {\n        users = Users(_users);\n    }\n\n    function addProduct(\n        string memory _name,\n        string memory _manufacturerName,\n        string memory _barcode,\n        string memory _manufacturedTime\n    ) public onlyManufacturer {\n        products.push(Types.Product(_name, _manufacturerName, _barcode, _manufacturedTime));\n        Types.Product memory _product = products[products.length - 1];\n\n        // Save barcode under sender's products\n        userProducts[msg.sender].push(_barcode);\n\n        productHistory[_product.barcode].push(Types.ProductHistory({\n            owner: msg.sender,\n            timestamp: block.timestamp\n        }));\n\n        emit NewProduct(\n            _product.name,\n            _product.manufacturerName,\n            _product.barcode,\n            _product.manufacturedTime\n        );\n    }\n\n    function sell(address buyer, string memory _barcode) public {\n        // Find product\n        Types.Product memory _product;\n        bool found = false;\n        for (uint i = 0; i < products.length; i++) {\n            if (keccak256(bytes(products[i].barcode)) == keccak256(bytes(_barcode))) {\n                _product = products[i];\n                found = true;\n                break;\n            }\n        }\n        require(found, \"Product not found\");\n\n        // Ensure seller owns it\n        string[] storage sellerProducts = userProducts[msg.sender];\n        uint256 productIndex = sellerProducts.length;\n        for (uint256 i = 0; i < sellerProducts.length; i++) {\n            if (keccak256(bytes(sellerProducts[i])) == keccak256(bytes(_barcode))) {\n                productIndex = i;\n                break;\n            }\n        }\n        require(productIndex < sellerProducts.length, \"Product not in seller inventory\");\n\n        // Remove from seller\n        if (productIndex < sellerProducts.length - 1) {\n            sellerProducts[productIndex] = sellerProducts[sellerProducts.length - 1];\n        }\n        sellerProducts.pop();\n\n        // Add to buyer\n        userProducts[buyer].push(_barcode);\n\n        // Log new owner\n        productHistory[_barcode].push(Types.ProductHistory({\n            owner: buyer,\n            timestamp: block.timestamp\n        }));\n\n        string memory buyerName = users.getUser(buyer).name;\n        string memory sellerName = users.getUser(msg.sender).name;\n\n        emit ProductOwnershipTransfer(\n            _product.name,\n            _product.manufacturerName,\n            _product.barcode,\n            buyerName,\n            sellerName,\n            block.timestamp\n        );\n    }\n}\n"
+      },
+      "project/contracts/SupplyChain.sol": {
+        "content": "// SPDX-License-Identifier: UNLICENSED\npragma solidity 0.8.30;\n\nimport \"./Types.sol\";\nimport \"./Users.sol\";\nimport \"./Products.sol\";\n\ncontract SupplyChain {\n    Users public users;\n    Products public products;\n\n    constructor() {\n        users = new Users();\n        products = new Products();\n        // link users instance to products instance\n        products.setUsersContract(address(users));\n    }\n\n    function registerUser(string memory _name,Types.UserRole _role) public {\n        users.addUser(_name, _role);\n    }\n\n    function returnUserInfo(address _addr) external view returns (string memory name, Types.UserRole role) {\n        users.getUserInfo(_addr);\n    }\n\n    function returnUser(address _addr) external view returns (Types.User memory) {\n        return users.getUser(_addr);\n    }\n\n    function registerProduct(\n        string memory _name,\n        string memory _manufacturerName,\n        string memory _barcode,\n        string memory _manufacturedTime\n    ) external {\n        products.addProduct(_name, _manufacturerName, _barcode, _manufacturedTime);\n    }\n\n    function sellProduct(address buyer, string memory _barcode) external {\n        products.sell(buyer, _barcode);\n    }\n}"
+      },
+      "project/contracts/Types.sol": {
+        "content": "// SPDX-License-Identifier: UNLICENSED\npragma solidity 0.8.30;\n\nlibrary Types {\n    enum UserRole {\n        Manufacturer,\n        Supplier,\n        Vendor,\n        Customer\n    }\n    \n    struct User {\n        address userAddress;\n        string name;\n        UserRole role;\n    }\n\n    struct Product {\n        string name;\n        string manufacturerName;\n        string barcode;\n        string manufacturedTime;\n    }\n\n    struct ProductHistory {\n        address owner;\n        uint256 timestamp;\n    }\n}\n"
+      },
+      "project/contracts/Users.sol": {
+        "content": "// SPDX-License-Identifier: UNLICENSED\npragma solidity 0.8.30;\n\nimport \"./Types.sol\";\n\ncontract Users {\n    uint public userCount = 0;\n    mapping(address => Types.User) public users;\n\n    event NewUser(\n        address userAddress,\n        string name,\n        Types.UserRole role\n    );\n\n    function addUser(string memory _name,Types.UserRole _role) public {\n        userCount += 1;\n        users[msg.sender] = Types.User(msg.sender, _name, _role);\n        emit NewUser(msg.sender, _name, _role);\n    }\n\n    function getUserInfo(address _addr) external view returns (string memory name, Types.UserRole role) {\n        Types.User memory usr = users[_addr];\n        return (usr.name, usr.role);\n    }\n\n    function getUser(address _addr) external view returns (Types.User memory) {\n        Types.User memory usr = users[_addr];\n        return usr;\n    }\n}\n"
+      }
+    }
+  }
+}
