@@ -21,7 +21,7 @@ contract SupplyChain {
     }
 
     function returnUserInfo(address _addr) external view returns (string memory name, Types.UserRole role) {
-        users.getUserInfo(_addr);
+        return users.getUserInfo(_addr);
     }
 
     function returnUser(address _addr) external view returns (Types.User memory) {
