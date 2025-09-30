@@ -9,15 +9,15 @@ contract SupplyChain {
     Users public users;
     Products public products;
 
-    constructor() {
-        users = new Users();
-        products = new Products();
-        // link users instance to products instance
-        products.setUsersContract(address(users));
+    constructor(address _users, address _products) {
+        users = Users(_users);
+        products = Products(_products);
+        products.setUsersContract(_users);
     }
 
-    function registerUser(string memory _name,Types.UserRole _role) public {
-        users.addUser(_name, _role);
+    function registerUser(string memory _name, Types.UserRole _role) public {
+        // Pass the original caller's address to Users contract
+        users.addUser(msg.sender, _name, _role);
     }
 
     function returnUserInfo(address _addr) external view returns (string memory name, Types.UserRole role) {
@@ -34,10 +34,10 @@ contract SupplyChain {
         string memory _barcode,
         string memory _manufacturedTime
     ) external {
-        products.addProduct(_name, _manufacturerName, _barcode, _manufacturedTime);
+        products.addProduct(msg.sender, _name, _manufacturerName, _barcode, _manufacturedTime);
     }
 
     function sellProduct(address buyer, string memory _barcode) external {
-        products.sell(buyer, _barcode);
+        products.sell(msg.sender, buyer, _barcode);
     }
 }

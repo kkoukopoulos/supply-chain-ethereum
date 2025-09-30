@@ -13,10 +13,13 @@ contract Users {
         Types.UserRole role
     );
 
-    function addUser(string memory _name,Types.UserRole _role) public {
-        userCount += 1;
-        users[msg.sender] = Types.User(msg.sender, _name, _role);
-        emit NewUser(msg.sender, _name, _role);
+    function addUser(address _userAddress, string memory _name, Types.UserRole _role) public {
+        if (bytes(users[_userAddress].name).length == 0) {
+            userCount += 1;
+        }
+        
+        users[_userAddress] = Types.User(_userAddress, _name, _role);
+        emit NewUser(_userAddress, _name, _role);
     }
 
     function getUserInfo(address _addr) external view returns (string memory name, Types.UserRole role) {
@@ -25,7 +28,6 @@ contract Users {
     }
 
     function getUser(address _addr) external view returns (Types.User memory) {
-        Types.User memory usr = users[_addr];
-        return usr;
+        return users[_addr];
     }
 }
