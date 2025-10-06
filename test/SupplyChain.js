@@ -1,13 +1,13 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("SupplyChain", function () {
+describe("SupplyChain with Manufacturer Restriction", function () {
   let SupplyChain, Users, Products;
   let supplyChain, users, products;
-  let owner, manufacturer, vendor, customer;
+  let owner, manufacturer, supplier, vendor, customer;
 
   beforeEach(async function () {
-    [owner, manufacturer, vendor, customer] = await ethers.getSigners();
+    [owner, manufacturer, supplier, vendor, customer] = await ethers.getSigners();
     
     // Deploy contracts
     Users = await ethers.getContractFactory("Users");
@@ -20,104 +20,270 @@ describe("SupplyChain", function () {
     supplyChain = await SupplyChain.deploy(users.target, products.target);
   });
 
-  it("should register a Manufacturer", async function () {
-    const tx = await supplyChain.connect(manufacturer).registerUser("Maker", 0);
-    await tx.wait();
-    
-    // Check through SupplyChain
-    const user = await supplyChain.returnUser(manufacturer.address);
-    expect(user.name).to.equal("Maker");
-    expect(user.role).to.equal(0);
+  describe("User Registration", function () {
+    it("should register users with different roles", async function () {
+      // Register different roles
+      await supplyChain.connect(manufacturer).registerUser("Manufacturer Inc", 0);
+      await supplyChain.connect(supplier).registerUser("Supplier Co", 1);
+      await supplyChain.connect(vendor).registerUser("Vendor Store", 2);
+      await supplyChain.connect(customer).registerUser("End Customer", 3);
+
+      // Verify roles
+      const manufacturerUser = await supplyChain.returnUser(manufacturer.address);
+      const supplierUser = await supplyChain.returnUser(supplier.address);
+      const vendorUser = await supplyChain.returnUser(vendor.address);
+      const customerUser = await supplyChain.returnUser(customer.address);
+
+      expect(manufacturerUser.role).to.equal(0); // Manufacturer
+      expect(supplierUser.role).to.equal(1); // Supplier
+      expect(vendorUser.role).to.equal(2); // Vendor
+      expect(customerUser.role).to.equal(3); // Customer
+    });
+
+    it("should correctly identify manufacturer status", async function () {
+      await supplyChain.connect(manufacturer).registerUser("Manufacturer Inc", 0);
+      await supplyChain.connect(customer).registerUser("Customer", 3);
+
+      // Use the new function in SupplyChain
+      const isManufacturer = await supplyChain.isUserManufacturer(manufacturer.address);
+      const isCustomerManufacturer = await supplyChain.isUserManufacturer(customer.address);
+
+      expect(isManufacturer).to.be.true;
+      expect(isCustomerManufacturer).to.be.false;
+    });
   });
 
-  it("should allow Manufacturer to add product", async function () {
-    // Register manufacturer first
-    await supplyChain.connect(manufacturer).registerUser("Maker", 0);
-    
-    // Add product
-    await supplyChain.connect(manufacturer).registerProduct(
-      "Phone",
-      "Maker",
-      "123456",
-      "2025-09-30"
-    );
-    
-    // Check product history - should be the manufacturer's address
-    const history = await products.productHistory("123456", 0);
-    expect(history.owner).to.equal(manufacturer.address);
+  describe("Product Registration with Manufacturer Restriction", function () {
+    beforeEach(async function () {
+      // Register users
+      await supplyChain.connect(manufacturer).registerUser("Manufacturer Inc", 0);
+      await supplyChain.connect(supplier).registerUser("Supplier Co", 1);
+      await supplyChain.connect(vendor).registerUser("Vendor Store", 2);
+      await supplyChain.connect(customer).registerUser("End Customer", 3);
+    });
+
+    it("should allow manufacturer to add product", async function () {
+      const tx = await supplyChain.connect(manufacturer).registerProduct(
+        "Smartphone",
+        "Manufacturer Inc",
+        "123456789012",
+        "2025-09-30T10:00:00Z"
+      );
+      await tx.wait();
+
+      // Verify product was added
+      const product = await products.getProductByBarcode("123456789012");
+      expect(product.name).to.equal("Smartphone");
+      expect(product.manufacturerName).to.equal("Manufacturer Inc");
+
+      // Verify manufacturer owns the product
+      const productCount = await products.getUserProductCount(manufacturer.address);
+      expect(productCount).to.equal(1);
+    });
+
+    it("should revert when supplier tries to add product", async function () {
+      await expect(
+        supplyChain.connect(supplier).registerProduct(
+          "Unauthorized Product",
+          "Supplier Co",
+          "999888777",
+          "2025-09-30"
+        )
+      ).to.be.revertedWith("Only manufacturer can add products.");
+    });
+
+    it("should revert when vendor tries to add product", async function () {
+      await expect(
+        supplyChain.connect(vendor).registerProduct(
+          "Unauthorized Product",
+          "Vendor Store",
+          "999888777",
+          "2025-09-30"
+        )
+      ).to.be.revertedWith("Only manufacturer can add products.");
+    });
+
+    it("should revert when customer tries to add product", async function () {
+      await expect(
+        supplyChain.connect(customer).registerProduct(
+          "Unauthorized Product",
+          "End Customer",
+          "999888777",
+          "2025-09-30"
+        )
+      ).to.be.revertedWith("Only manufacturer can add products.");
+    });
+
+    it("should revert when unregistered user tries to add product", async function () {
+      const unregisteredUser = owner; // owner hasn't registered as any role
+
+      // Now it should revert with "User not registered" because we check registration first
+      await expect(
+        supplyChain.connect(unregisteredUser).registerProduct(
+          "Unauthorized Product",
+          "Unregistered User",
+          "999888777",
+          "2025-09-30"
+        )
+      ).to.be.revertedWith("User not registered");
+    });
+
+    it("should revert when adding product with duplicate barcode", async function () {
+      // Add first product
+      await supplyChain.connect(manufacturer).registerProduct(
+        "Smartphone",
+        "Manufacturer Inc",
+        "123456789012",
+        "2025-09-30"
+      );
+
+      // Try to add product with same barcode
+      await expect(
+        supplyChain.connect(manufacturer).registerProduct(
+          "Another Phone",
+          "Manufacturer Inc",
+          "123456789012", // Same barcode
+          "2025-10-01"
+        )
+      ).to.be.revertedWith("Product with this barcode already exists");
+    });
   });
 
-  it("should transfer product from manufacturer to vendor", async function () {
-    // Register users
-    await supplyChain.connect(manufacturer).registerUser("Maker", 0);
-    await supplyChain.connect(vendor).registerUser("Reseller", 2);
-    
-    // Add product
-    await supplyChain.connect(manufacturer).registerProduct(
-      "Phone",
-      "Maker",
-      "123456",
-      "2025-09-30"
-    );
+  describe("Product Transfers", function () {
+    const testBarcode = "123456789012";
 
-    // Verify manufacturer has the product initially
-    let manufacturerProductCount = await products.getUserProductCount(manufacturer.address);
-    expect(manufacturerProductCount).to.equal(1);
-    
-    // Transfer product
-    await supplyChain.connect(manufacturer).sellProduct(vendor.address, "123456");
+    beforeEach(async function () {
+      // Register all users
+      await supplyChain.connect(manufacturer).registerUser("Manufacturer Inc", 0);
+      await supplyChain.connect(supplier).registerUser("Supplier Co", 1);
+      await supplyChain.connect(vendor).registerUser("Vendor Store", 2);
+      await supplyChain.connect(customer).registerUser("End Customer", 3);
 
-    // Check new owner in history
-    const historyLength = await products.getProductHistoryLength("123456");
-    expect(historyLength).to.equal(2);
-    
-    const latestHistory = await products.productHistory("123456", 1);
-    expect(latestHistory.owner).to.equal(vendor.address);
-    
-    // Check vendor now owns the product and manufacturer doesn't
-    const vendorProductCount = await products.getUserProductCount(vendor.address);
-    manufacturerProductCount = await products.getUserProductCount(manufacturer.address);
-    expect(vendorProductCount).to.equal(1);
-    expect(manufacturerProductCount).to.equal(0);
+      // Manufacturer adds a product
+      await supplyChain.connect(manufacturer).registerProduct(
+        "Smartphone",
+        "Manufacturer Inc",
+        testBarcode,
+        "2025-09-30"
+      );
+    });
+
+    it("should transfer product from manufacturer to supplier", async function () {
+      // Verify initial state
+      let manufacturerProductCount = await products.getUserProductCount(manufacturer.address);
+      let supplierProductCount = await products.getUserProductCount(supplier.address);
+      expect(manufacturerProductCount).to.equal(1);
+      expect(supplierProductCount).to.equal(0);
+
+      // Transfer
+      await supplyChain.connect(manufacturer).sellProduct(supplier.address, testBarcode);
+
+      // Verify transfer
+      manufacturerProductCount = await products.getUserProductCount(manufacturer.address);
+      supplierProductCount = await products.getUserProductCount(supplier.address);
+      expect(manufacturerProductCount).to.equal(0);
+      expect(supplierProductCount).to.equal(1);
+
+      // Verify history
+      const history = await products.productHistory(testBarcode, 1);
+      expect(history.owner).to.equal(supplier.address);
+    });
+
+    it("should transfer product through multiple parties", async function () {
+      // Initial state: product created (1 history entry)
+      
+      // Manufacturer -> Supplier (2nd history entry)
+      await supplyChain.connect(manufacturer).sellProduct(supplier.address, testBarcode);
+      
+      // Supplier -> Vendor (3rd history entry)
+      await supplyChain.connect(supplier).sellProduct(vendor.address, testBarcode);
+      
+      // Vendor -> Customer (4th history entry)
+      await supplyChain.connect(vendor).sellProduct(customer.address, testBarcode);
+
+      // Verify final owner
+      const customerProductCount = await products.getUserProductCount(customer.address);
+      expect(customerProductCount).to.equal(1);
+
+      // Verify history length: 4 entries total (creation + 3 transfers)
+      const historyLength = await products.getProductHistoryLength(testBarcode);
+      expect(historyLength).to.equal(4);
+      
+      // Verify the last entry is the customer
+      const latestHistory = await products.productHistory(testBarcode, 3);
+      expect(latestHistory.owner).to.equal(customer.address);
+    });
+
+    it("should revert when non-owner tries to sell product", async function () {
+      // Supplier tries to sell product they don't own
+      await expect(
+        supplyChain.connect(supplier).sellProduct(vendor.address, testBarcode)
+      ).to.be.revertedWith("Product not in seller inventory");
+    });
+
+    it("should revert when selling to unregistered user", async function () {
+      const unregisteredUser = owner; // owner hasn't registered
+
+      await expect(
+        supplyChain.connect(manufacturer).sellProduct(unregisteredUser.address, testBarcode)
+      ).to.be.revertedWith("User not registered");
+    });
+
+    it("should revert when selling non-existent product", async function () {
+      await expect(
+        supplyChain.connect(manufacturer).sellProduct(supplier.address, "NON_EXISTENT_BARCODE")
+      ).to.be.revertedWith("Product not found");
+    });
+
+    it("should revert when selling to self", async function () {
+      await expect(
+        supplyChain.connect(manufacturer).sellProduct(manufacturer.address, testBarcode)
+      ).to.be.revertedWith("Cannot sell to yourself");
+    });
   });
 
-  it("should revert if non-manufacturer tries to add product", async function () {
-    // Register customer (not manufacturer)
-    await supplyChain.connect(customer).registerUser("Buyer", 3);
-    
-    // This should work for now since we removed the manufacturer check
-    await supplyChain.connect(customer).registerProduct(
-      "Fake",
-      "Buyer",
-      "999",
-      "2025-09-30"
-    );
-    
-    // Verify the product was added
-    const product = await products.getProductByBarcode("999");
-    expect(product.name).to.equal("Fake");
-  });
+  describe("Edge Cases", function () {
+    it("should handle multiple products from same manufacturer", async function () {
+      await supplyChain.connect(manufacturer).registerUser("Manufacturer Inc", 0);
 
-  // Debug test to check what's happening with user registration
-  it("DEBUG: Check user registration flow", async function () {
-    console.log("Manufacturer address:", manufacturer.address);
-    
-    // Register through SupplyChain
-    const tx = await supplyChain.connect(manufacturer).registerUser("SupplyChainMaker", 0);
-    await tx.wait();
-    
-    // Check through SupplyChain
-    const userViaSupplyChain = await supplyChain.returnUser(manufacturer.address);
-    console.log("Via SupplyChain:", userViaSupplyChain);
-    
-    // Check directly from Users contract
-    const userDirect = await users.getUser(manufacturer.address);
-    console.log("Direct from Users:", userDirect);
-    
-    // The issue might be that the Users contract is storing the user under the wrong address
-    // Let's check if the user is stored under the SupplyChain address
-    const supplyChainAddr = supplyChain.target;
-    const userAtSupplyChainAddr = await users.getUser(supplyChainAddr);
-    console.log("User at SupplyChain address:", userAtSupplyChainAddr);
+      // Add multiple products
+      await supplyChain.connect(manufacturer).registerProduct("Product1", "Manufacturer Inc", "111", "2025-01-01");
+      await supplyChain.connect(manufacturer).registerProduct("Product2", "Manufacturer Inc", "222", "2025-01-02");
+      await supplyChain.connect(manufacturer).registerProduct("Product3", "Manufacturer Inc", "333", "2025-01-03");
+
+      const productCount = await products.getUserProductCount(manufacturer.address);
+      expect(productCount).to.equal(3);
+
+      // Verify all products exist
+      const product1 = await products.getProductByBarcode("111");
+      const product2 = await products.getProductByBarcode("222");
+      const product3 = await products.getProductByBarcode("333");
+
+      expect(product1.name).to.equal("Product1");
+      expect(product2.name).to.equal("Product2");
+      expect(product3.name).to.equal("Product3");
+    });
+
+    it("should enforce input validation", async function () {
+      await supplyChain.connect(manufacturer).registerUser("Manufacturer Inc", 0);
+
+      await expect(
+        supplyChain.connect(manufacturer).registerProduct(
+          "", // Empty name
+          "Manufacturer Inc",
+          "123456",
+          "2025-09-30"
+        )
+      ).to.be.revertedWith("Product name cannot be empty");
+
+      await expect(
+        supplyChain.connect(manufacturer).registerProduct(
+          "Valid Product",
+          "Manufacturer Inc",
+          "", // Empty barcode
+          "2025-09-30"
+        )
+      ).to.be.revertedWith("Barcode cannot be empty");
+    });
   });
 });

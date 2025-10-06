@@ -29,18 +29,34 @@ contract Products {
         uint256 transferTime
     );
 
+    // Re-enabled manufacturer restriction
+    modifier onlyManufacturer(address _manufacturer) {
+        Types.User memory user = users.getUser(_manufacturer);
+        require(user.role == Types.UserRole.Manufacturer, "Only manufacturer can add products.");
+        require(bytes(user.name).length > 0, "User not registered");
+        _;
+    }
+
+    modifier onlyRegisteredUser(address _user) {
+        Types.User memory user = users.getUser(_user);
+        require(bytes(user.name).length > 0, "User not registered");
+        _;
+    }
+
     function setUsersContract(address _users) public {
         users = Users(_users);
     }
 
     function addProduct(
-        address _manufacturer, // Add manufacturer address as parameter
+        address _manufacturer,
         string memory _name,
         string memory _manufacturerName,
         string memory _barcode,
         string memory _manufacturedTime
-    ) public {
+    ) public onlyManufacturer(_manufacturer) {
         require(!productExists[_barcode], "Product with this barcode already exists");
+        require(bytes(_name).length > 0, "Product name cannot be empty");
+        require(bytes(_barcode).length > 0, "Barcode cannot be empty");
         
         Types.Product memory newProduct = Types.Product(_name, _manufacturerName, _barcode, _manufacturedTime);
         products.push(newProduct);
@@ -58,8 +74,13 @@ contract Products {
         emit NewProduct(_manufacturer, _name, _manufacturerName, _barcode, _manufacturedTime);
     }
 
-    function sell(address _seller, address _buyer, string memory _barcode) public {
+    function sell(address _seller, address _buyer, string memory _barcode) 
+        public 
+        onlyRegisteredUser(_seller) 
+        onlyRegisteredUser(_buyer) 
+    {
         require(productExists[_barcode], "Product not found");
+        require(_seller != _buyer, "Cannot sell to yourself");
 
         // Ensure seller owns it
         string[] storage sellerProducts = userProducts[_seller];
@@ -110,5 +131,10 @@ contract Products {
 
     function getProductHistoryLength(string memory _barcode) public view returns (uint) {
         return productHistory[_barcode].length;
+    }
+
+    function isUserManufacturer(address user) public view returns (bool) {
+        Types.User memory userData = users.getUser(user);
+        return userData.role == Types.UserRole.Manufacturer;
     }
 }

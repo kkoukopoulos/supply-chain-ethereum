@@ -16,7 +16,6 @@ contract SupplyChain {
     }
 
     function registerUser(string memory _name, Types.UserRole _role) public {
-        // Pass the original caller's address to Users contract
         users.addUser(msg.sender, _name, _role);
     }
 
@@ -39,5 +38,11 @@ contract SupplyChain {
 
     function sellProduct(address buyer, string memory _barcode) external {
         products.sell(msg.sender, buyer, _barcode);
+    }
+
+    // Add this function to check manufacturer status
+    function isUserManufacturer(address user) external view returns (bool) {
+        Types.User memory userData = users.getUser(user);
+        return userData.role == Types.UserRole.Manufacturer;
     }
 }
