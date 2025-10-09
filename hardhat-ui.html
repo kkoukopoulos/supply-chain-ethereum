@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hardhat Supply Chain UI</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+    <style>
+        body { font-family: Arial; max-width: 1000px; margin: 0 auto; padding: 20px; }
+        .container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .panel { border: 1px solid #ccc; padding: 15px; border-radius: 5px; }
+        button { padding: 8px 15px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; }
+        input, select { padding: 8px; margin: 5px; width: 200px; }
+        .account { background: #f8f9fa; padding: 10px; margin: 5px 0; border-radius: 4px; }
+        .log { background: #f8f9fa; padding: 10px; margin: 10px 0; border-radius: 4px; max-height: 300px; overflow-y: auto; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>🔗 Hardhat Supply Chain UI</h1>
+    
+    <div class="container">
+        <!-- Left Panel: Accounts & Setup -->
+        <div class="panel">
+            <h2>Setup</h2>
+            <button onclick="connectToHardhat()">Connect to Hardhat</button>
+            <button onclick="loadContract()">Load Contract</button>
+            
+            <h3>Accounts</h3>
+            <div id="accountsList"></div>
+            
+            <h3>Contract Info</h3>
+            <div id="contractInfo"></div>
+        </div>
+
+        <!-- Right Panel: Interactions -->
+        <div class="panel">
+            <h2>Interactions</h2>
+            
+            <h3>User Management</h3>
+            <select id="accountSelect"></select>
+            <input type="text" id="userName" placeholder="User Name">
+            <select id="userRole">
+                <option value="0">Manufacturer</option>
+                <option value="1">Supplier</option>
+                <option value="2">Vendor</option>
+                <option value="3">Customer</option>
+            </select>
+            <button onclick="registerUser()">Register User</button>
+
+            <h3>Product Management</h3>
+            <input type="text" id="productName" placeholder="Product Name">
+            <input type="text" id="manufacturerName" placeholder="Manufacturer Name">
+            <input type="text" id="barcode" placeholder="Barcode">
+            <input type="text" id="manufacturedTime" placeholder="2024-01-01">
+            <button onclick="registerProduct()">Register Product</button>
+
+            <h3>Transfer Product</h3>
+            <select id="fromAccount"></select>
+            <select id="toAccount"></select>
+            <input type="text" id="transferBarcode" placeholder="Barcode">
+            <button onclick="transferProduct()">Transfer Product</button>
+
+            <h3>Query</h3>
+            <input type="text" id="queryAddress" placeholder="Address to check">
+            <button onclick="checkUser()">Check User</button>
+            <button onclick="checkProduct()">Check Product</button>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>Activity Log</h2>
+        <div id="activityLog" class="log"></div>
+    </div>
+
+    <script>
+        // Hardhat configuration
+        const HARDHAT_RPC_URL = 'http://localhost:8545';
+        const CONTRACT_ADDRESS = '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0'; // Replace with your address
+        const CONTRACT_ABI = [
+            "function registerUser(string memory _name, uint8 _role) public",
+            "function returnUser(address _addr) external view returns (tuple(address userAddress, string name, uint8 role))",
+            "function registerProduct(string memory _name, string memory _manufacturerName, string memory _barcode, string memory _manufacturedTime) external",
+            "function sellProduct(address buyer, string memory _barcode) external",
+            "function isUserManufacturer(address user) external view returns (bool)"
+        ];
+
+        // Hardhat test accounts (private keys)
+        const TEST_ACCOUNTS = [
+            { 
+                name: 'Account #0', 
+                privateKey: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
+                address: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
+            },
+            { 
+                name: 'Account #1', 
+                privateKey: '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d',
+                address: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
+            },
+            { 
+                name: 'Account #2', 
+                privateKey: '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a',
+                address: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC'
+            }
+        ];
+
+        let provider, contract, currentAccount;
+
+        // Connect to Hardhat node
+        async function connectToHardhat() {
+            try {
+                log('Connecting to Hardhat node...');
+                provider = new ethers.providers.JsonRpcProvider(HARDHAT_RPC_URL);
+                
+                // Test connection
+                const network = await provider.getNetwork();
+                const blockNumber = await provider.getBlockNumber();
+                
+                log(`Connected to Hardhat network (Chain ID: ${network.chainId})`);
+                log(`Current block: ${blockNumber}`);
+                
+                displayAccounts();
+                
+            } catch (error) {
+                log(`Failed to connect: ${error.message}`, 'error');
+            }
+        }
+
+        // Load contract
+        async function loadContract() {
+            if (!provider) {
+                log('Please connect to Hardhat first', 'error');
+                return;
+            }
+            
+            try {
+                // Use first account as default
+                const wallet = new ethers.Wallet(TEST_ACCOUNTS[0].privateKey, provider);
+                contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, wallet);
+                currentAccount = wallet;
+                
+                log(`Contract loaded at: ${CONTRACT_ADDRESS}`);
+                log(`Using account: ${wallet.address}`);
+                
+                document.getElementById('contractInfo').innerHTML = 
+                    `<strong>Contract:</strong> ${CONTRACT_ADDRESS}<br>
+                     <strong>Current Account:</strong> ${wallet.address}`;
+                     
+            } catch (error) {
+                log(`Failed to load contract: ${error.message}`, 'error');
+            }
+        }
+
+        // Display available accounts
+        function displayAccounts() {
+            const accountsList = document.getElementById('accountsList');
+            const accountSelect = document.getElementById('accountSelect');
+            const fromAccount = document.getElementById('fromAccount');
+            const toAccount = document.getElementById('toAccount');
+            
+            accountsList.innerHTML = '';
+            accountSelect.innerHTML = '';
+            fromAccount.innerHTML = '';
+            toAccount.innerHTML = '';
+            
+            TEST_ACCOUNTS.forEach((account, index) => {
+                // Accounts list
+                accountsList.innerHTML += `
+                    <div class="account">
+                        <strong>${account.name}</strong><br>
+                        ${account.address}<br>
+                        <small>Balance: <span id="balance-${index}">Loading...</span> ETH</small>
+                    </div>
+                `;
+                
+                // Dropdown options
+                const option = `<option value="${account.privateKey}">${account.name}</option>`;
+                accountSelect.innerHTML += option;
+                fromAccount.innerHTML += option;
+                toAccount.innerHTML += option;
+                
+                // Load balances
+                loadBalance(account.address, index);
+            });
+        }
+
+        // Load account balance
+        async function loadBalance(address, index) {
+            if (!provider) return;
+            
+            try {
+                const balance = await provider.getBalance(address);
+                const balanceEth = ethers.utils.formatEther(balance);
+                document.getElementById(`balance-${index}`).textContent = parseFloat(balanceEth).toFixed(2);
+            } catch (error) {
+                console.error('Error loading balance:', error);
+            }
+        }
+
+        // Register user
+        async function registerUser() {
+            if (!contract) {
+                log('Please load contract first', 'error');
+                return;
+            }
+            
+            const privateKey = document.getElementById('accountSelect').value;
+            const name = document.getElementById('userName').value;
+            const role = parseInt(document.getElementById('userRole').value);
+            
+            if (!name) {
+                log('Please enter a user name', 'error');
+                return;
+            }
+            
+            try {
+                // Switch to selected account
+                const wallet = new ethers.Wallet(privateKey, provider);
+                contract = contract.connect(wallet);
+                currentAccount = wallet;
+                
+                log(`Registering user: ${name} with role ${role}...`);
+                
+                const tx = await contract.registerUser(name, role);
+                log(`Transaction sent: ${tx.hash}`);
+                
+                const receipt = await tx.wait();
+                log(`User registered successfully! (Block: ${receipt.blockNumber})`);
+                
+                document.getElementById('userName').value = '';
+                
+            } catch (error) {
+                log(`Registration failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Register product
+        async function registerProduct() {
+            if (!contract) {
+                log('Please load contract first', 'error');
+                return;
+            }
+            
+            const name = document.getElementById('productName').value;
+            const manufacturerName = document.getElementById('manufacturerName').value;
+            const barcode = document.getElementById('barcode').value;
+            const manufacturedTime = document.getElementById('manufacturedTime').value;
+            
+            if (!name || !manufacturerName || !barcode || !manufacturedTime) {
+                log('Please fill all product fields', 'error');
+                return;
+            }
+            
+            try {
+                log(`Registering product: ${name} (Barcode: ${barcode})...`);
+                
+                const tx = await contract.registerProduct(name, manufacturerName, barcode, manufacturedTime);
+                log(`Transaction sent: ${tx.hash}`);
+                
+                const receipt = await tx.wait();
+                log(`Product registered successfully! (Block: ${receipt.blockNumber})`);
+                
+                // Clear form
+                document.getElementById('productName').value = '';
+                document.getElementById('manufacturerName').value = '';
+                document.getElementById('barcode').value = '';
+                document.getElementById('manufacturedTime').value = '';
+                
+            } catch (error) {
+                log(`Product registration failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Transfer product
+        async function transferProduct() {
+            if (!contract) {
+                log('Please load contract first', 'error');
+                return;
+            }
+            
+            const fromPrivateKey = document.getElementById('fromAccount').value;
+            const toPrivateKey = document.getElementById('toAccount').value;
+            const barcode = document.getElementById('transferBarcode').value;
+            
+            if (!barcode) {
+                log('Please enter a barcode', 'error');
+                return;
+            }
+            
+            try {
+                // Get the "to" address
+                const toWallet = new ethers.Wallet(toPrivateKey, provider);
+                const toAddress = toWallet.address;
+                
+                // Switch to "from" account
+                const fromWallet = new ethers.Wallet(fromPrivateKey, provider);
+                contract = contract.connect(fromWallet);
+                currentAccount = fromWallet;
+                
+                log(`Transferring product ${barcode} from ${fromWallet.address.slice(0, 8)} to ${toAddress.slice(0, 8)}...`);
+                
+                const tx = await contract.sellProduct(toAddress, barcode);
+                log(`Transaction sent: ${tx.hash}`);
+                
+                const receipt = await tx.wait();
+                log(`Product transferred successfully! (Block: ${receipt.blockNumber})`);
+                
+                document.getElementById('transferBarcode').value = '';
+                
+            } catch (error) {
+                log(`Transfer failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Check user
+        async function checkUser() {
+            if (!contract) {
+                log('Please load contract first', 'error');
+                return;
+            }
+            
+            let address = document.getElementById('queryAddress').value;
+            if (!address) {
+                // Use current account if none provided
+                address = currentAccount.address;
+            }
+            
+            try {
+                log(`Checking user: ${address}...`);
+                
+                const user = await contract.returnUser(address);
+                
+                if (user.name === '') {
+                    log(`User not registered at address: ${address}`);
+                } else {
+                    const roles = ['Manufacturer', 'Supplier', 'Vendor', 'Customer'];
+                    log(`User found: ${user.name} (${roles[user.role]})`);
+                }
+                
+            } catch (error) {
+                log(`Check user failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Check product (placeholder - you'd need to add this function to your contract)
+        async function checkProduct() {
+            log('Product check function needs to be implemented in contract');
+        }
+
+        // Logging function
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('activityLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'black';
+            
+            logElement.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            log('Hardhat Supply Chain UI loaded. Click "Connect to Hardhat" to start.');
+        });
+    </script>
+</body>
+</html>
