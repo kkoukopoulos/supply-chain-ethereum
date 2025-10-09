@@ -1,9 +1,0 @@
-terminal 1: npx hardhat node
-
-terminal 2: npx hardhat run scripts/deploy.js --network localhost
-(then, replace hardhat-ui.html: CONTRACT_ADDRESS with deployed SupplyChain address)
-
-terminal 3: python3 -m http.server 8000
-(go to http://localhost:8000/hardhat-ui.html in browser)
-
-(cloudflare cdn works: <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>)
