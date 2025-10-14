@@ -21,15 +21,12 @@ contract Products {
     );
 
     event ProductOwnershipTransfer(
-        string name,
-        string manufacturerName,
         string barcode,
         address buyer,
         address seller,
         uint256 transferTime
     );
 
-    // Re-enabled manufacturer restriction
     modifier onlyManufacturer(address _manufacturer) {
         Types.User memory user = users.getUser(_manufacturer);
         require(user.role == Types.UserRole.Manufacturer, "Only manufacturer can add products.");
@@ -63,7 +60,6 @@ contract Products {
         barcodeToProduct[_barcode] = newProduct;
         productExists[_barcode] = true;
 
-        // Save barcode under manufacturer's products
         userProducts[_manufacturer].push(_barcode);
 
         productHistory[_barcode].push(Types.ProductHistory({
@@ -82,42 +78,62 @@ contract Products {
         require(productExists[_barcode], "Product not found");
         require(_seller != _buyer, "Cannot sell to yourself");
 
-        // Ensure seller owns it
-        string[] storage sellerProducts = userProducts[_seller];
-        bool foundInInventory = false;
-        uint256 productIndex = sellerProducts.length;
+        // Get seller and buyer roles
+        Types.User memory sellerUser = users.getUser(_seller);
+        Types.User memory buyerUser = users.getUser(_buyer);
         
-        for (uint256 i = 0; i < sellerProducts.length; i++) {
-            if (keccak256(bytes(sellerProducts[i])) == keccak256(bytes(_barcode))) {
-                productIndex = i;
-                foundInInventory = true;
-                break;
-            }
-        }
+        // Get current product history
+        Types.ProductHistory[] storage history = productHistory[_barcode];
+        require(history.length > 0, "Product has no history");
         
-        require(foundInInventory, "Product not in seller inventory");
+        address currentOwner = history[history.length - 1].owner;
+        require(currentOwner == _seller, "Only current owner can sell product");
+        
+        // Enforce the supply chain path
+        _validateTransferPath(sellerUser.role, buyerUser.role);
 
-        // Remove from seller
-        sellerProducts[productIndex] = sellerProducts[sellerProducts.length - 1];
-        sellerProducts.pop();
-
-        // Add to buyer
-        userProducts[_buyer].push(_barcode);
+        // Remove from seller and add to buyer
+        _transferOwnership(_seller, _buyer, _barcode);
 
         // Log new owner
-        productHistory[_barcode].push(Types.ProductHistory({
+        history.push(Types.ProductHistory({
             owner: _buyer,
             timestamp: block.timestamp
         }));
 
-        emit ProductOwnershipTransfer(
-            barcodeToProduct[_barcode].name,
-            barcodeToProduct[_barcode].manufacturerName,
-            _barcode,
-            _buyer,
-            _seller,
-            block.timestamp
-        );
+        emit ProductOwnershipTransfer(_barcode, _buyer, _seller, block.timestamp);
+    }
+
+    function _validateTransferPath(Types.UserRole sellerRole, Types.UserRole buyerRole) internal pure {
+        if (sellerRole == Types.UserRole.Manufacturer) {
+            require(buyerRole == Types.UserRole.Supplier, "Manufacturer can only sell to Supplier");
+        } else if (sellerRole == Types.UserRole.Supplier) {
+            require(buyerRole == Types.UserRole.Vendor, "Supplier can only sell to Vendor");
+        } else if (sellerRole == Types.UserRole.Vendor) {
+            require(buyerRole == Types.UserRole.Customer, "Vendor can only sell to Customer");
+        } else {
+            revert("Customer cannot sell the product");
+        }
+    }
+
+    function _transferOwnership(address _seller, address _buyer, string memory _barcode) internal {
+        // Remove from seller
+        string[] storage sellerProducts = userProducts[_seller];
+        bool found = false;
+        
+        for (uint256 i = 0; i < sellerProducts.length; i++) {
+            if (keccak256(bytes(sellerProducts[i])) == keccak256(bytes(_barcode))) {
+                sellerProducts[i] = sellerProducts[sellerProducts.length - 1];
+                sellerProducts.pop();
+                found = true;
+                break;
+            }
+        }
+        
+        require(found, "Product not in seller inventory");
+
+        // Add to buyer
+        userProducts[_buyer].push(_barcode);
     }
 
     function getProductByBarcode(string memory _barcode) public view returns (Types.Product memory) {
@@ -131,6 +147,11 @@ contract Products {
 
     function getProductHistoryLength(string memory _barcode) public view returns (uint) {
         return productHistory[_barcode].length;
+    }
+
+    function getProductHistory(string memory _barcode) public view returns (Types.ProductHistory[] memory) {
+        require(productExists[_barcode], "Product not found");
+        return productHistory[_barcode];
     }
 
     function isUserManufacturer(address user) public view returns (bool) {

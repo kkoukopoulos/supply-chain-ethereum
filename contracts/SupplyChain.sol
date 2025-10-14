@@ -40,9 +40,23 @@ contract SupplyChain {
         products.sell(msg.sender, buyer, _barcode);
     }
 
-    // Add this function to check manufacturer status
     function isUserManufacturer(address user) external view returns (bool) {
         Types.User memory userData = users.getUser(user);
         return userData.role == Types.UserRole.Manufacturer;
+    }
+
+    function isSaleAllowed(address seller, address buyer) external view returns (bool) {
+        Types.User memory sellerUser = users.getUser(seller);
+        Types.User memory buyerUser = users.getUser(buyer);
+        
+        if (sellerUser.role == Types.UserRole.Manufacturer) {
+            return buyerUser.role == Types.UserRole.Supplier;
+        } else if (sellerUser.role == Types.UserRole.Supplier) {
+            return buyerUser.role == Types.UserRole.Vendor;
+        } else if (sellerUser.role == Types.UserRole.Vendor) {
+            return buyerUser.role == Types.UserRole.Customer;
+        }
+        
+        return false;
     }
 }
