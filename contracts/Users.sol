@@ -14,6 +14,7 @@ contract Users {
     );
 
     function addUser(address _userAddress, string memory _name, Types.UserRole _role) public {
+        // Check if user exists
         if (bytes(users[_userAddress].name).length == 0) {
             userCount += 1;
         }

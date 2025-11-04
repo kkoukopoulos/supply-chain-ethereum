@@ -2,5 +2,12 @@
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^6.1.0",
     "hardhat": "^2.26.3"
+  },
+  "scripts": {
+    "deploy": "npx hardhat run scripts/deploy.js --network localhost",
+    "listen": "node scripts/startEventListener.js",
+    "db:init": "psql -U kostas -d supplychain -f db/schema.sql",
+    "db:sync": "node db/sync.js",
+    "test": "npx hardhat test"
   }
 }
