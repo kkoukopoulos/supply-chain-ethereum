@@ -1,16 +1,8 @@
 const EventListener = require('./eventListener');
-const { abi } = require('../artifacts/contracts/SupplyChain.sol/SupplyChain.json');
 require('dotenv').config();
 
 async function start() {
-  const contractAddress = process.env.CONTRACT_ADDRESS;
-  
-  if (!contractAddress) {
-    console.error('CONTRACT_ADDRESS not found in .env file. Please deploy contracts first.');
-    process.exit(1);
-  }
-
-  const listener = new EventListener(contractAddress, abi, process.env.RPC_URL);
+  const listener = new EventListener(process.env.RPC_URL);
   
   try {
     await listener.startListening();

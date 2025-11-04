@@ -3,17 +3,34 @@ const DatabaseModels = require('../db/models');
 require('dotenv').config();
 
 class EventListener {
-  constructor(contractAddress, abi, providerUrl) {
+  constructor(providerUrl) {
     this.provider = new ethers.JsonRpcProvider(providerUrl || process.env.RPC_URL);
-    this.contract = new ethers.Contract(contractAddress, abi, this.provider);
     this.lastBlock = 0;
   }
 
   async startListening() {
     console.log('Starting event listener...');
 
-    // New User event
-    this.contract.on('NewUser', async (userAddress, name, role, event) => {
+    // Get contract addresses
+    const usersAddress = process.env.USERS_CONTRACT_ADDRESS;
+    const productsAddress = process.env.PRODUCTS_CONTRACT_ADDRESS;
+    const supplyChainAddress = process.env.CONTRACT_ADDRESS;
+
+    if (!usersAddress || !productsAddress) {
+      console.error('Contract addresses not found in .env file');
+      return;
+    }
+
+    // Load ABIs
+    const usersAbi = require('../artifacts/contracts/Users.sol/Users.json').abi;
+    const productsAbi = require('../artifacts/contracts/Products.sol/Products.json').abi;
+
+    // Create contract instances
+    this.usersContract = new ethers.Contract(usersAddress, usersAbi, this.provider);
+    this.productsContract = new ethers.Contract(productsAddress, productsAbi, this.provider);
+
+    // Listen to Users contract events
+    this.usersContract.on('NewUser', async (userAddress, name, role, event) => {
       console.log('NewUser event detected:', { userAddress, name, role: role.toString() });
       
       try {
@@ -32,8 +49,8 @@ class EventListener {
       }
     });
 
-    // New Product event
-    this.contract.on('NewProduct', async (manufacturer, name, manufacturerName, barcode, manufacturedTime, event) => {
+    // Listen to Products contract events
+    this.productsContract.on('NewProduct', async (manufacturer, name, manufacturerName, barcode, manufacturedTime, event) => {
       console.log('NewProduct event detected:', { manufacturer, name, barcode });
       
       try {
@@ -68,8 +85,7 @@ class EventListener {
       }
     });
 
-    // Product Ownership Transfer event
-    this.contract.on('ProductOwnershipTransfer', async (barcode, buyer, seller, transferTime, event) => {
+    this.productsContract.on('ProductOwnershipTransfer', async (barcode, buyer, seller, transferTime, event) => {
       console.log('ProductOwnershipTransfer event detected:', { barcode, buyer, seller });
       
       try {
@@ -96,6 +112,9 @@ class EventListener {
     });
 
     console.log('Event listener started successfully');
+    console.log('Listening to:');
+    console.log(`  - Users contract: ${usersAddress}`);
+    console.log(`  - Products contract: ${productsAddress}`);
   }
 
   getRoleName(roleId) {
@@ -104,7 +123,12 @@ class EventListener {
   }
 
   async stopListening() {
-    this.contract.removeAllListeners();
+    if (this.usersContract) {
+      this.usersContract.removeAllListeners();
+    }
+    if (this.productsContract) {
+      this.productsContract.removeAllListeners();
+    }
     console.log('Event listener stopped');
   }
 }

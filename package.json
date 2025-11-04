@@ -6,8 +6,8 @@
   "scripts": {
     "deploy": "npx hardhat run scripts/deploy.js --network localhost",
     "listen": "node scripts/startEventListener.js",
+    "test": "npx hardhat test --network localhost",
     "db:init": "psql -U kostas -d supplychain -f db/schema.sql",
-    "db:sync": "node db/sync.js",
-    "test": "npx hardhat test"
+    "db:sync": "node db/sync.js"
   }
 }
