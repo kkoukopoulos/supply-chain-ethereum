@@ -1,21 +1,10 @@
-// test/SupplyChain.js
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const DBTestHelper = require("./db-test-helper");
 
-describe("SupplyChain with Database Logging", function () {
+describe("SupplyChain with Manufacturer Restriction", function () {
   let SupplyChain, Users, Products;
   let supplyChain, users, products;
   let owner, manufacturer, supplier, vendor, customer;
-
-  before(async function () {
-    await DBTestHelper.connect();
-    await DBTestHelper.clearDatabase();
-  });
-
-  after(async function () {
-    await DBTestHelper.disconnect();
-  });
 
   beforeEach(async function () {
     [owner, manufacturer, supplier, vendor, customer] = await ethers.getSigners();
@@ -31,18 +20,11 @@ describe("SupplyChain with Database Logging", function () {
   });
 
   describe("User Registration", function () {
-    it("should register users with different roles and log to database", async function () {
+    it("should register users with different roles", async function () {
       await supplyChain.connect(manufacturer).registerUser("Manufacturer Inc", 0);
-      await DBTestHelper.logUserToDB(manufacturer.address, "Manufacturer Inc", "Manufacturer");
-
       await supplyChain.connect(supplier).registerUser("Supplier Co", 1);
-      await DBTestHelper.logUserToDB(supplier.address, "Supplier Co", "Supplier");
-
       await supplyChain.connect(vendor).registerUser("Vendor Store", 2);
-      await DBTestHelper.logUserToDB(vendor.address, "Vendor Store", "Vendor");
-
       await supplyChain.connect(customer).registerUser("End Customer", 3);
-      await DBTestHelper.logUserToDB(customer.address, "End Customer", "Customer");
 
       const manufacturerUser = await supplyChain.returnUser(manufacturer.address);
       const supplierUser = await supplyChain.returnUser(supplier.address);
@@ -57,10 +39,7 @@ describe("SupplyChain with Database Logging", function () {
 
     it("should correctly identify manufacturer status", async function () {
       await supplyChain.connect(manufacturer).registerUser("Manufacturer Inc", 0);
-      await DBTestHelper.logUserToDB(manufacturer.address, "Manufacturer Inc", "Manufacturer");
-      
       await supplyChain.connect(customer).registerUser("Customer", 3);
-      await DBTestHelper.logUserToDB(customer.address, "Customer", "Customer");
 
       const isManufacturer = await supplyChain.isUserManufacturer(manufacturer.address);
       const isCustomerManufacturer = await supplyChain.isUserManufacturer(customer.address);
@@ -76,27 +55,14 @@ describe("SupplyChain with Database Logging", function () {
       await supplyChain.connect(supplier).registerUser("Supplier Co", 1);
       await supplyChain.connect(vendor).registerUser("Vendor Store", 2);
       await supplyChain.connect(customer).registerUser("End Customer", 3);
-
-      await DBTestHelper.logUserToDB(manufacturer.address, "Manufacturer Inc", "Manufacturer");
-      await DBTestHelper.logUserToDB(supplier.address, "Supplier Co", "Supplier");
-      await DBTestHelper.logUserToDB(vendor.address, "Vendor Store", "Vendor");
-      await DBTestHelper.logUserToDB(customer.address, "End Customer", "Customer");
     });
 
-    it("should allow manufacturer to add product and log to database", async function () {
+    it("should allow manufacturer to add product", async function () {
       await supplyChain.connect(manufacturer).registerProduct(
         "Smartphone",
         "Manufacturer Inc",
         "123456789012",
         "2025-09-30T10:00:00Z"
-      );
-
-      await DBTestHelper.logProductToDB(
-        "Smartphone",
-        "Manufacturer Inc",
-        "123456789012",
-        "2025-09-30T10:00:00Z",
-        manufacturer.address
       );
 
       const product = await products.getProductByBarcode("123456789012");
@@ -127,24 +93,11 @@ describe("SupplyChain with Database Logging", function () {
       await supplyChain.connect(vendor).registerUser("Vendor Store", 2);
       await supplyChain.connect(customer).registerUser("End Customer", 3);
 
-      await DBTestHelper.logUserToDB(manufacturer.address, "Manufacturer Inc", "Manufacturer");
-      await DBTestHelper.logUserToDB(supplier.address, "Supplier Co", "Supplier");
-      await DBTestHelper.logUserToDB(vendor.address, "Vendor Store", "Vendor");
-      await DBTestHelper.logUserToDB(customer.address, "End Customer", "Customer");
-
       await supplyChain.connect(manufacturer).registerProduct(
         "Smartphone",
         "Manufacturer Inc",
         testBarcode,
         "2025-09-30"
-      );
-
-      await DBTestHelper.logProductToDB(
-        "Smartphone",
-        "Manufacturer Inc",
-        testBarcode,
-        "2025-09-30",
-        manufacturer.address
       );
     });
 
@@ -152,8 +105,6 @@ describe("SupplyChain with Database Logging", function () {
       await expect(
         supplyChain.connect(manufacturer).sellProduct(supplier.address, testBarcode)
       ).not.to.be.reverted;
-      
-      await DBTestHelper.logProductTransferToDB(testBarcode, manufacturer.address, supplier.address);
     });
 
     it("should prevent manufacturer from selling directly to vendor", async function () {
@@ -165,15 +116,12 @@ describe("SupplyChain with Database Logging", function () {
     it("should allow proper path: manufacturer->supplier->vendor->customer", async function () {
       // Manufacturer -> Supplier
       await supplyChain.connect(manufacturer).sellProduct(supplier.address, testBarcode);
-      await DBTestHelper.logProductTransferToDB(testBarcode, manufacturer.address, supplier.address);
       
       // Supplier -> Vendor
       await supplyChain.connect(supplier).sellProduct(vendor.address, testBarcode);
-      await DBTestHelper.logProductTransferToDB(testBarcode, supplier.address, vendor.address);
       
       // Vendor -> Customer
       await supplyChain.connect(vendor).sellProduct(customer.address, testBarcode);
-      await DBTestHelper.logProductTransferToDB(testBarcode, vendor.address, customer.address);
 
       const customerProductCount = await products.getUserProductCount(customer.address);
       expect(customerProductCount).to.equal(1);
@@ -181,7 +129,6 @@ describe("SupplyChain with Database Logging", function () {
 
     it("should prevent supplier from selling to customer", async function () {
       await supplyChain.connect(manufacturer).sellProduct(supplier.address, testBarcode);
-      await DBTestHelper.logProductTransferToDB(testBarcode, manufacturer.address, supplier.address);
       
       await expect(
         supplyChain.connect(supplier).sellProduct(customer.address, testBarcode)
@@ -190,13 +137,8 @@ describe("SupplyChain with Database Logging", function () {
 
     it("should prevent customer from selling", async function () {
       await supplyChain.connect(manufacturer).sellProduct(supplier.address, testBarcode);
-      await DBTestHelper.logProductTransferToDB(testBarcode, manufacturer.address, supplier.address);
-      
       await supplyChain.connect(supplier).sellProduct(vendor.address, testBarcode);
-      await DBTestHelper.logProductTransferToDB(testBarcode, supplier.address, vendor.address);
-      
       await supplyChain.connect(vendor).sellProduct(customer.address, testBarcode);
-      await DBTestHelper.logProductTransferToDB(testBarcode, vendor.address, customer.address);
       
       await expect(
         supplyChain.connect(customer).sellProduct(vendor.address, testBarcode)
@@ -213,39 +155,23 @@ describe("SupplyChain with Database Logging", function () {
       await supplyChain.connect(vendor).registerUser("Vendor Store", 2);
       await supplyChain.connect(customer).registerUser("End Customer", 3);
 
-      await DBTestHelper.logUserToDB(manufacturer.address, "Manufacturer Inc", "Manufacturer");
-      await DBTestHelper.logUserToDB(supplier.address, "Supplier Co", "Supplier");
-      await DBTestHelper.logUserToDB(vendor.address, "Vendor Store", "Vendor");
-      await DBTestHelper.logUserToDB(customer.address, "End Customer", "Customer");
-
       await supplyChain.connect(manufacturer).registerProduct(
         "Smartphone",
         "Manufacturer Inc",
         testBarcode,
         "2025-09-30"
       );
-
-      await DBTestHelper.logProductToDB(
-        "Smartphone",
-        "Manufacturer Inc",
-        testBarcode,
-        "2025-09-30",
-        manufacturer.address
-      );
     });
 
     it("should track product history through transfers", async function () {
       // Manufacturer -> Supplier
       await supplyChain.connect(manufacturer).sellProduct(supplier.address, testBarcode);
-      await DBTestHelper.logProductTransferToDB(testBarcode, manufacturer.address, supplier.address);
       
       // Supplier -> Vendor
       await supplyChain.connect(supplier).sellProduct(vendor.address, testBarcode);
-      await DBTestHelper.logProductTransferToDB(testBarcode, supplier.address, vendor.address);
       
       // Vendor -> Customer
       await supplyChain.connect(vendor).sellProduct(customer.address, testBarcode);
-      await DBTestHelper.logProductTransferToDB(testBarcode, vendor.address, customer.address);
 
       const history = await products.getProductHistory(testBarcode);
       expect(history.length).to.equal(4);
