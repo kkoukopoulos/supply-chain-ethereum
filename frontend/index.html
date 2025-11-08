@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Supply Chain App</title>
+    <script src="https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .section { border: 1px solid #ccc; padding: 20px; margin: 10px 0; border-radius: 5px; }
+        button { background: #007bff; color: white; border: none; padding: 10px 15px; margin: 5px; cursor: pointer; border-radius: 3px; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        input, select { width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ccc; border-radius: 3px; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <h1>🔗 Supply Chain Management</h1>
+
+    <!-- Wallet Connection -->
+    <div class="section">
+        <h2>1. Wallet Connection</h2>
+        <div id="status">
+            <div id="ethersStatus">⏳ Checking Ethers.js...</div>
+            <div id="metaMaskStatus">⏳ Checking MetaMask...</div>
+        </div>
+        <button onclick="connectWallet()" id="connectButton" disabled>Connect Wallet</button>
+        <div id="walletStatus">Not connected</div>
+    </div>
+
+    <!-- User Registration -->
+    <div class="section" id="userSection" style="display: none;">
+        <h2>2. Register User</h2>
+        <input type="text" id="userName" placeholder="Your name">
+        <select id="userRole">
+            <option value="0">Manufacturer</option>
+            <option value="1">Supplier</option>
+            <option value="2">Vendor</option>
+            <option value="3">Customer</option>
+        </select>
+        <button onclick="registerUser()">Register User</button>
+        <div id="userResult"></div>
+    </div>
+
+    <!-- Product Registration -->
+    <div class="section" id="productSection" style="display: none;">
+        <h2>3. Register Product</h2>
+        <input type="text" id="productName" placeholder="Product name">
+        <input type="text" id="manufacturerName" placeholder="Manufacturer name">
+        <input type="text" id="barcode" placeholder="Barcode">
+        <input type="text" id="manufacturedTime" placeholder="Manufactured time (e.g., 2025-09-30)">
+        <button onclick="registerProduct()">Register Product</button>
+        <div id="productResult"></div>
+    </div>
+
+    <!-- Product Transfer -->
+    <div class="section" id="transferSection" style="display: none;">
+        <h2>4. Transfer Product</h2>
+        <input type="text" id="transferBarcode" placeholder="Product barcode">
+        <input type="text" id="buyerAddress" placeholder="Buyer wallet address (0x...)">
+        <button onclick="transferProduct()">Transfer Product</button>
+        <div id="transferResult"></div>
+    </div>
+
+    <!-- Product Lookup -->
+    <div class="section" id="lookupSection" style="display: none;">
+        <h2>5. Lookup Product</h2>
+        <input type="text" id="lookupBarcode" placeholder="Enter barcode">
+        <button onclick="lookupProduct()">Lookup Product</button>
+        <div id="productInfo"></div>
+    </div>
+
+    <script>
+        // Contract configuration - UPDATE THIS WITH YOUR ACTUAL DEPLOYED ADDRESS
+        const CONTRACT_ADDRESS = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"; // Replace with your actual address
+        const CONTRACT_ABI = [
+            "function registerUser(string name, uint8 role) public",
+            "function registerProduct(string name, string manufacturerName, string barcode, string manufacturedTime) external",
+            "function sellProduct(address buyer, string barcode) external",
+            "function returnUser(address addr) external view returns (tuple(address userAddress, string name, uint8 role))",
+            "function getProductByBarcode(string barcode) public view returns (tuple(string name, string manufacturerName, string barcode, string manufacturedTime))",
+            "function isUserManufacturer(address user) external view returns (bool)"
+        ];
+
+        let provider, signer, contract, userAddress;
+
+        // Check if everything is loaded properly
+        function initializeApp() {
+            // Check Ethers.js
+            if (typeof ethers === 'undefined') {
+                document.getElementById('ethersStatus').innerHTML = 
+                    '<span class="error">❌ Ethers.js not loaded</span>';
+                return;
+            } else {
+                document.getElementById('ethersStatus').innerHTML = 
+                    '<span class="success">✅ Ethers.js v' + ethers.version + ' loaded</span>';
+            }
+
+            // Check MetaMask
+            if (typeof window.ethereum === 'undefined') {
+                document.getElementById('metaMaskStatus').innerHTML = 
+                    '<span class="error">❌ MetaMask not found</span>';
+                return;
+            } else {
+                document.getElementById('metaMaskStatus').innerHTML = 
+                    '<span class="success">✅ MetaMask detected</span>';
+                document.getElementById('connectButton').disabled = false;
+            }
+        }
+
+        // Connect to MetaMask using Ethers.js v5 syntax
+        async function connectWallet() {
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    document.getElementById('walletStatus').innerHTML = 
+                        '<span class="info">🔄 Setting up Hardhat network...</span>';
+
+                    const chainId = '0x7a69'; // 31337 in hex
+                    
+                    try {
+                        // Try to switch to Hardhat network
+                        await window.ethereum.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: chainId }],
+                        });
+                    } catch (switchError) {
+                        // This error code means the chain hasn't been added to MetaMask
+                        if (switchError.code === 4902) {
+                            // Add the Hardhat network
+                            await window.ethereum.request({
+                                method: 'wallet_addEthereumChain',
+                                params: [{
+                                    chainId: chainId,
+                                    chainName: 'Hardhat Local',
+                                    rpcUrls: ['http://localhost:8545'],
+                                    nativeCurrency: {
+                                        name: 'ETH',
+                                        symbol: 'ETH',
+                                        decimals: 18
+                                    },
+                                    blockExplorerUrls: ['']
+                                }],
+                            });
+                        } else {
+                            throw switchError;
+                        }
+                    }
+
+                    // Now connect the wallet
+                    document.getElementById('walletStatus').innerHTML = 
+                        '<span class="info">🔄 Connecting wallet...</span>';
+                    
+                    provider = new ethers.providers.Web3Provider(window.ethereum);
+                    await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    signer = provider.getSigner();
+                    userAddress = await signer.getAddress();
+                    
+                    contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+                    
+                    document.getElementById('walletStatus').innerHTML = 
+                        `<span class="success">✅ Connected to Hardhat: ${userAddress.slice(0,6)}...${userAddress.slice(-4)}</span>`;
+                    
+                    // Show app sections
+                    document.getElementById('userSection').style.display = 'block';
+                    document.getElementById('productSection').style.display = 'block';
+                    document.getElementById('transferSection').style.display = 'block';
+                    document.getElementById('lookupSection').style.display = 'block';
+                    
+                } catch (error) {
+                    console.error('Connection error:', error);
+                    document.getElementById('walletStatus').innerHTML = 
+                        `<span class="error">❌ Failed: ${error.message}</span>`;
+                }
+            } else {
+                document.getElementById('walletStatus').innerHTML = 
+                    '<span class="error">❌ MetaMask not found</span>';
+            }
+        }
+
+        // Register user
+        async function registerUser() {
+            if (!contract) {
+                alert("Please connect wallet first!");
+                return;
+            }
+
+            const name = document.getElementById('userName').value;
+            const role = document.getElementById('userRole').value;
+
+            if (!name) {
+                alert("Please enter a name");
+                return;
+            }
+
+            try {
+                document.getElementById('userResult').innerHTML = '<span class="info">⏳ Sending transaction...</span>';
+                
+                // Send transaction
+                const tx = await contract.registerUser(name, role);
+                document.getElementById('userResult').innerHTML = '<span class="info">⏳ Waiting for confirmation...</span>';
+                
+                // Wait for transaction to be mined
+                await tx.wait();
+                document.getElementById('userResult').innerHTML = '<span class="success">✅ User registered successfully!</span>';
+                
+                // Clear form
+                document.getElementById('userName').value = '';
+                
+            } catch (error) {
+                console.error('Registration error:', error);
+                document.getElementById('userResult').innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        }
+
+        // Register product
+        async function registerProduct() {
+            if (!contract) {
+                alert("Please connect wallet first!");
+                return;
+            }
+
+            const name = document.getElementById('productName').value;
+            const manufacturerName = document.getElementById('manufacturerName').value;
+            const barcode = document.getElementById('barcode').value;
+            const manufacturedTime = document.getElementById('manufacturedTime').value;
+
+            if (!name || !manufacturerName || !barcode) {
+                alert("Please fill all required fields");
+                return;
+            }
+
+            try {
+                document.getElementById('productResult').innerHTML = '<span class="info">⏳ Sending transaction...</span>';
+                
+                const tx = await contract.registerProduct(name, manufacturerName, barcode, manufacturedTime);
+                document.getElementById('productResult').innerHTML = '<span class="info">⏳ Waiting for confirmation...</span>';
+                
+                await tx.wait();
+                document.getElementById('productResult').innerHTML = '<span class="success">✅ Product registered successfully!</span>';
+                
+                // Clear form
+                document.getElementById('productName').value = '';
+                document.getElementById('manufacturerName').value = '';
+                document.getElementById('barcode').value = '';
+                document.getElementById('manufacturedTime').value = '';
+                
+            } catch (error) {
+                console.error('Product registration error:', error);
+                document.getElementById('productResult').innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        }
+
+        // Transfer product
+        async function transferProduct() {
+            if (!contract) {
+                alert("Please connect wallet first!");
+                return;
+            }
+
+            const barcode = document.getElementById('transferBarcode').value;
+            const buyerAddress = document.getElementById('buyerAddress').value;
+
+            if (!barcode || !buyerAddress) {
+                alert("Please fill all fields");
+                return;
+            }
+
+            try {
+                document.getElementById('transferResult').innerHTML = '<span class="info">⏳ Sending transaction...</span>';
+                
+                const tx = await contract.sellProduct(buyerAddress, barcode);
+                document.getElementById('transferResult').innerHTML = '<span class="info">⏳ Waiting for confirmation...</span>';
+                
+                await tx.wait();
+                document.getElementById('transferResult').innerHTML = '<span class="success">✅ Product transferred successfully!</span>';
+                
+                // Clear form
+                document.getElementById('transferBarcode').value = '';
+                document.getElementById('buyerAddress').value = '';
+                
+            } catch (error) {
+                console.error('Transfer error:', error);
+                document.getElementById('transferResult').innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        }
+
+        // Lookup product
+        async function lookupProduct() {
+            if (!contract) {
+                alert("Please connect wallet first!");
+                return;
+            }
+
+            const barcode = document.getElementById('lookupBarcode').value;
+
+            if (!barcode) {
+                alert("Please enter a barcode");
+                return;
+            }
+
+            try {
+                document.getElementById('productInfo').innerHTML = '<span class="info">⏳ Looking up product...</span>';
+                
+                const product = await contract.getProductByBarcode(barcode);
+                
+                document.getElementById('productInfo').innerHTML = `
+                    <h3>Product Details:</h3>
+                    <p><strong>Name:</strong> ${product.name}</p>
+                    <p><strong>Manufacturer:</strong> ${product.manufacturerName}</p>
+                    <p><strong>Barcode:</strong> ${product.barcode}</p>
+                    <p><strong>Manufactured:</strong> ${product.manufacturedTime}</p>
+                `;
+                
+            } catch (error) {
+                console.error('Lookup error:', error);
+                document.getElementById('productInfo').innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        }
+
+        // Initialize when page loads
+        window.onload = function() {
+            setTimeout(initializeApp, 100);
+        };
+    </script>
+</body>
+</html>
