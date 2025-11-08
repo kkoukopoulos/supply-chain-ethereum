@@ -56,12 +56,12 @@ describe("SupplyChain with Database Logging", function () {
     });
 
     it("should correctly identify manufacturer status", async function () {
-      await supplyChain.connect(manufacturer).registerUser("Manufacturer Inc", 0);
-      await DBTestHelper.logUserToDB(manufacturer.address, "Manufacturer Inc", "Manufacturer");
+      await supplyChain.connect(manufacturer).registerUser("Manufacturer 1", 0);
+      await DBTestHelper.logUserToDB(manufacturer.address, "Manufacturer 1", "Manufacturer");
       
-      await supplyChain.connect(customer).registerUser("Customer", 3);
-      await DBTestHelper.logUserToDB(customer.address, "Customer", "Customer");
-
+      await supplyChain.connect(customer).registerUser("Customer 1", 3);
+      await DBTestHelper.logUserToDB(customer.address, "Customer 1", "Customer");
+ 
       const isManufacturer = await supplyChain.isUserManufacturer(manufacturer.address);
       const isCustomerManufacturer = await supplyChain.isUserManufacturer(customer.address);
 
@@ -72,35 +72,35 @@ describe("SupplyChain with Database Logging", function () {
 
   describe("Product Registration", function () {
     beforeEach(async function () {
-      await supplyChain.connect(manufacturer).registerUser("Manufacturer Inc", 0);
-      await supplyChain.connect(supplier).registerUser("Supplier Co", 1);
-      await supplyChain.connect(vendor).registerUser("Vendor Store", 2);
-      await supplyChain.connect(customer).registerUser("End Customer", 3);
+      await supplyChain.connect(manufacturer).registerUser("Manufacturer 1", 0);
+      await supplyChain.connect(supplier).registerUser("Supplier 1", 1);
+      await supplyChain.connect(vendor).registerUser("Vendor 1", 2);
+      await supplyChain.connect(customer).registerUser("Customer 1", 3);
 
-      await DBTestHelper.logUserToDB(manufacturer.address, "Manufacturer Inc", "Manufacturer");
-      await DBTestHelper.logUserToDB(supplier.address, "Supplier Co", "Supplier");
-      await DBTestHelper.logUserToDB(vendor.address, "Vendor Store", "Vendor");
-      await DBTestHelper.logUserToDB(customer.address, "End Customer", "Customer");
+      await DBTestHelper.logUserToDB(manufacturer.address, "Manufacturer 1", "Manufacturer");
+      await DBTestHelper.logUserToDB(supplier.address, "Supplier 1", "Supplier");
+      await DBTestHelper.logUserToDB(vendor.address, "Vendor 1", "Vendor");
+      await DBTestHelper.logUserToDB(customer.address, "Customer 1", "Customer");
     });
 
     it("should allow manufacturer to add product and log to database", async function () {
       await supplyChain.connect(manufacturer).registerProduct(
-        "Smartphone",
-        "Manufacturer Inc",
-        "123456789012",
+        "Drug 1",
+        "Manufacturer 1",
+        "0123456789",
         "2025-09-30T10:00:00Z"
       );
 
       await DBTestHelper.logProductToDB(
-        "Smartphone",
-        "Manufacturer Inc",
-        "123456789012",
+        "Drug 1",
+        "Manufacturer 1",
+        "0123456789",
         "2025-09-30T10:00:00Z",
         manufacturer.address
       );
 
-      const product = await products.getProductByBarcode("123456789012");
-      expect(product.name).to.equal("Smartphone");
+      const product = await products.getProductByBarcode("0123456789");
+      expect(product.name).to.equal("Drug 1");
 
       const productCount = await products.getUserProductCount(manufacturer.address);
       expect(productCount).to.equal(1);
@@ -109,9 +109,9 @@ describe("SupplyChain with Database Logging", function () {
     it("should revert when non-manufacturer tries to add product", async function () {
       await expect(
         supplyChain.connect(supplier).registerProduct(
-          "Unauthorized Product",
-          "Supplier Co",
-          "999888777",
+          "Drug X",
+          "Supplier 1",
+          "9876543210",
           "2025-09-30"
         )
       ).to.be.revertedWith("Only manufacturer can add products.");
@@ -119,29 +119,29 @@ describe("SupplyChain with Database Logging", function () {
   });
 
   describe("Supply Chain Path Enforcement", function () {
-    const testBarcode = "123456789012";
+    const testBarcode = "0123456789";
 
     beforeEach(async function () {
-      await supplyChain.connect(manufacturer).registerUser("Manufacturer Inc", 0);
-      await supplyChain.connect(supplier).registerUser("Supplier Co", 1);
-      await supplyChain.connect(vendor).registerUser("Vendor Store", 2);
-      await supplyChain.connect(customer).registerUser("End Customer", 3);
+      await supplyChain.connect(manufacturer).registerUser("Manufacturer 1", 0);
+      await supplyChain.connect(supplier).registerUser("Supplier 1", 1);
+      await supplyChain.connect(vendor).registerUser("Vendor 1", 2);
+      await supplyChain.connect(customer).registerUser("Customer 1", 3);
 
-      await DBTestHelper.logUserToDB(manufacturer.address, "Manufacturer Inc", "Manufacturer");
-      await DBTestHelper.logUserToDB(supplier.address, "Supplier Co", "Supplier");
-      await DBTestHelper.logUserToDB(vendor.address, "Vendor Store", "Vendor");
-      await DBTestHelper.logUserToDB(customer.address, "End Customer", "Customer");
+      await DBTestHelper.logUserToDB(manufacturer.address, "Manufacturer 1", "Manufacturer");
+      await DBTestHelper.logUserToDB(supplier.address, "Supplier 1", "Supplier");
+      await DBTestHelper.logUserToDB(vendor.address, "Vendor 1", "Vendor");
+      await DBTestHelper.logUserToDB(customer.address, "Customer 1", "Customer");
 
       await supplyChain.connect(manufacturer).registerProduct(
-        "Smartphone",
-        "Manufacturer Inc",
+        "Drug 1",
+        "Manufacturer 1",
         testBarcode,
         "2025-09-30"
       );
 
       await DBTestHelper.logProductToDB(
-        "Smartphone",
-        "Manufacturer Inc",
+        "Drug 1",
+        "Manufacturer 1",
         testBarcode,
         "2025-09-30",
         manufacturer.address
@@ -205,29 +205,29 @@ describe("SupplyChain with Database Logging", function () {
   });
 
   describe("Product History", function () {
-    const testBarcode = "123456789012";
+    const testBarcode = "0123456789";
 
     beforeEach(async function () {
-      await supplyChain.connect(manufacturer).registerUser("Manufacturer Inc", 0);
-      await supplyChain.connect(supplier).registerUser("Supplier Co", 1);
-      await supplyChain.connect(vendor).registerUser("Vendor Store", 2);
-      await supplyChain.connect(customer).registerUser("End Customer", 3);
+      await supplyChain.connect(manufacturer).registerUser("Manufacturer 1", 0);
+      await supplyChain.connect(supplier).registerUser("Supplier 1", 1);
+      await supplyChain.connect(vendor).registerUser("Vendor 1", 2);
+      await supplyChain.connect(customer).registerUser("Customer 1", 3);
 
-      await DBTestHelper.logUserToDB(manufacturer.address, "Manufacturer Inc", "Manufacturer");
-      await DBTestHelper.logUserToDB(supplier.address, "Supplier Co", "Supplier");
-      await DBTestHelper.logUserToDB(vendor.address, "Vendor Store", "Vendor");
-      await DBTestHelper.logUserToDB(customer.address, "End Customer", "Customer");
+      await DBTestHelper.logUserToDB(manufacturer.address, "Manufacturer 1", "Manufacturer");
+      await DBTestHelper.logUserToDB(supplier.address, "Supplier 1", "Supplier");
+      await DBTestHelper.logUserToDB(vendor.address, "Vendor 1", "Vendor");
+      await DBTestHelper.logUserToDB(customer.address, "Customer 1", "Customer");
 
       await supplyChain.connect(manufacturer).registerProduct(
-        "Smartphone",
-        "Manufacturer Inc",
+        "Drug 1",
+        "Manufacturer 1",
         testBarcode,
         "2025-09-30"
       );
 
       await DBTestHelper.logProductToDB(
-        "Smartphone",
-        "Manufacturer Inc",
+        "Drug 1",
+        "Manufacturer 1",
         testBarcode,
         "2025-09-30",
         manufacturer.address
