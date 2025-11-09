@@ -1,4 +1,5 @@
 terminal 1:
+npx hardhat compile
 npx hardhat node
 
 terminal 2:

@@ -1,59 +1,41 @@
 const { ethers } = require("hardhat");
 
 async function main() {
-  console.log("Deploying Supply Chain Contracts...");
+  console.log("🚀 Deploying Supply Chain Contracts...");
 
-  // Get the deployer account
   const [deployer] = await ethers.getSigners();
-  console.log("Deploying contracts with account:", deployer.address);
+  console.log("Deployer:", deployer.address);
 
-  // Deploy Users contract
-  console.log("Deploying Users contract...");
+  // Deploy in sequence
   const Users = await ethers.getContractFactory("Users");
   const users = await Users.deploy();
   await users.waitForDeployment();
-  const usersAddress = await users.getAddress();
-  console.log("Users deployed to:", usersAddress);
 
-  // Deploy Products contract
-  console.log("Deploying Products contract...");
   const Products = await ethers.getContractFactory("Products");
   const products = await Products.deploy();
   await products.waitForDeployment();
-  const productsAddress = await products.getAddress();
-  console.log("Products deployed to:", productsAddress);
 
-  // Deploy SupplyChain contract
-  console.log("Deploying SupplyChain contract...");
   const SupplyChain = await ethers.getContractFactory("SupplyChain");
-  const supplyChain = await SupplyChain.deploy(usersAddress, productsAddress);
+  const supplyChain = await SupplyChain.deploy(await users.getAddress(), await products.getAddress());
   await supplyChain.waitForDeployment();
-  const supplyChainAddress = await supplyChain.getAddress();
-  console.log("SupplyChain deployed to:", supplyChainAddress);
 
-  // Set the Users contract in Products contract
-  console.log("Setting Users contract in Products...");
-  await products.setUsersContract(usersAddress);
-  console.log("Users contract set in Products");
+  // Connect contracts
+  await products.setUsersContract(await users.getAddress());
 
-  // Save the addresses to a file for frontend use
+  console.log("\n✅ Deployment Complete!");
+  console.log("Users:", await users.getAddress());
+  console.log("Products:", await products.getAddress());
+  console.log("SupplyChain:", await supplyChain.getAddress());
+
+  // Save addresses
   const addresses = {
-    users: usersAddress,
-    products: productsAddress,
-    supplyChain: supplyChainAddress
+    users: await users.getAddress(),
+    products: await products.getAddress(),
+    supplyChain: await supplyChain.getAddress()
   };
-
-  console.log("\nAll contracts deployed successfully");
-  console.log("======================================");
-  console.log("Users:", usersAddress);
-  console.log("Products:", productsAddress);
-  console.log("SupplyChain:", supplyChainAddress);
-  console.log("======================================\n");
+  
+  require('fs').writeFileSync('deployed-addresses.json', JSON.stringify(addresses, null, 2));
+  console.log("📄 Addresses saved to deployed-addresses.json");
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
+main().catch(console.error);

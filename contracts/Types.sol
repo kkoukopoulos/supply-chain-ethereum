@@ -13,6 +13,7 @@ library Types {
         address userAddress;
         string name;
         UserRole role;
+        string publicKey;
     }
 
     struct Product {
