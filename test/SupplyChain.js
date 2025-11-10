@@ -32,17 +32,17 @@ describe("SupplyChain with Database Logging", function () {
 
   describe("User Registration", function () {
     it("should register users with different roles and log to database", async function () {
-      await supplyChain.connect(manufacturer).registerUser("Manufacturer Inc", 0);
-      await DBTestHelper.logUserToDB(manufacturer.address, "Manufacturer Inc", "Manufacturer");
+      await supplyChain.connect(manufacturer).registerUser("Manufacturer 1", 0);
+      await DBTestHelper.logUserToDB(manufacturer.address, "Manufacturer 1", "Manufacturer");
 
-      await supplyChain.connect(supplier).registerUser("Supplier Co", 1);
-      await DBTestHelper.logUserToDB(supplier.address, "Supplier Co", "Supplier");
+      await supplyChain.connect(supplier).registerUser("Supplier 1", 1);
+      await DBTestHelper.logUserToDB(supplier.address, "Supplier 1", "Supplier");
 
-      await supplyChain.connect(vendor).registerUser("Vendor Store", 2);
-      await DBTestHelper.logUserToDB(vendor.address, "Vendor Store", "Vendor");
+      await supplyChain.connect(vendor).registerUser("Vendor 1", 2);
+      await DBTestHelper.logUserToDB(vendor.address, "Vendor 1", "Vendor");
 
-      await supplyChain.connect(customer).registerUser("End Customer", 3);
-      await DBTestHelper.logUserToDB(customer.address, "End Customer", "Customer");
+      await supplyChain.connect(customer).registerUser("Customer 1", 3);
+      await DBTestHelper.logUserToDB(customer.address, "Customer 1", "Customer");
 
       const manufacturerUser = await supplyChain.returnUser(manufacturer.address);
       const supplierUser = await supplyChain.returnUser(supplier.address);
