@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Supply Chain - Username Transfer</title>
+    <title>Supply Chain DApp</title>
     <script src="https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
@@ -16,7 +16,7 @@
     </style>
 </head>
 <body>
-    <h1>🔗 Supply Chain Management</h1>
+    <h1>Supply Chain Management</h1>
 
     <!-- Navigation -->
     <div style="margin-bottom: 20px;">
@@ -29,13 +29,6 @@
     <div id="registerTab" class="tab active">
         <div class="section">
             <h2>Register New User</h2>
-            
-            <div class="info-box">
-                <h3>🔐 How it works:</h3>
-                <p>• Choose any username you want</p>
-                <p>• Transfer products using usernames (no wallet addresses needed!)</p>
-                <p>• Your username is your identity on the blockchain</p>
-            </div>
 
             <h3>User Information</h3>
             <input type="text" id="regUsername" placeholder="Choose your username (e.g., john_doe, acme_corp)">
@@ -57,10 +50,6 @@
     <div id="loginTab" class="tab">
         <div class="section">
             <h2>Login with Username</h2>
-            
-            <div class="info-box">
-                <p>Use the username you chose during registration</p>
-            </div>
 
             <input type="text" id="loginUsername" placeholder="Your username">
             <input type="password" id="loginPassword" placeholder="Your password">
@@ -72,7 +61,7 @@
     <!-- Application Tab -->
     <div id="appTab" class="tab">
         <div class="section">
-            <h2>Welcome, <span id="userWelcome"></span>!</h2>
+            <h2>Logged in as: <span id="userWelcome"></span></h2>
             <p><strong>Username:</strong> <span id="displayUsername"></span></p>
             <p><strong>Wallet Address:</strong> <span id="userAddress"></span></p>
             <p><strong>Role:</strong> <span id="userRole"></span></p>
@@ -91,10 +80,7 @@
 
         <div class="section">
             <h3>Transfer Product to User</h3>
-            <div class="info-box">
-                <p>💡 <strong>New:</strong> Transfer using username instead of wallet address!</p>
-                <p>Just enter the buyer's username (e.g., "supplier_company")</p>
-            </div>
+            
             <input type="text" id="transferBarcode" placeholder="Product barcode">
             <input type="text" id="buyerUsername" placeholder="Buyer's username">
             <button onclick="transferProductByUsername()">Transfer Product</button>
@@ -128,7 +114,7 @@
     </div>
 
     <script>
-        // Contract configuration - UPDATE THIS WITH YOUR ACTUAL DEPLOYED ADDRESS
+        // Contract configuration
         const CONTRACT_ADDRESS = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0";
         const CONTRACT_ABI = [
             "function registerUser(string name, uint8 role, string publicKey) public",
@@ -183,7 +169,7 @@
             }
 
             try {
-                document.getElementById('regResult').innerHTML = "⏳ Creating your account...";
+                document.getElementById('regResult').innerHTML = "Creating your account...";
 
                 // Connect to blockchain
                 provider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
@@ -196,7 +182,7 @@
                 const fundedWallet = new ethers.Wallet(fundedPrivateKeys[randomIndex], provider);
                 
                 // Fund the user's wallet with a small amount of ETH for gas
-                document.getElementById('regResult').innerHTML = "⏳ Funding your wallet...";
+                document.getElementById('regResult').innerHTML = "Funding your wallet...";
                 const fundTx = await fundedWallet.sendTransaction({
                     to: userWallet.address,
                     value: ethers.utils.parseEther("0.01") // Send 0.01 ETH for gas
@@ -207,7 +193,7 @@
                 const userContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, userWallet);
                 
                 // Register user on blockchain using THEIR OWN wallet
-                document.getElementById('regResult').innerHTML = "⏳ Registering on blockchain...";
+                document.getElementById('regResult').innerHTML = "Registering on blockchain...";
                 const tx = await userContract.registerUser(name, role, username);
                 await tx.wait();
 
@@ -225,7 +211,7 @@
 
                 // Show success
                 document.getElementById('regResult').innerHTML = 
-                    '<span class="success">✅ Registration successful! You can now login.</span>';
+                    '<span class="success">Registration successful! You can now login.</span>';
 
                 // Clear form
                 document.getElementById('regUsername').value = '';
@@ -245,12 +231,10 @@
                 }
                 
                 document.getElementById('regResult').innerHTML = 
-                    '<span class="error">❌ Registration failed: ' + errorMessage + '</span>';
+                    '<span class="error">Registration failed: ' + errorMessage + '</span>';
             }
         }
 
-        // Login user with custom username
-        // Login user with custom username - SIMPLIFIED VERSION
         async function loginUser() {
             const username = document.getElementById('loginUsername').value.trim();
             const password = document.getElementById('loginPassword').value;
@@ -261,7 +245,7 @@
             }
 
             try {
-                document.getElementById('loginResult').innerHTML = "⏳ Logging in...";
+                document.getElementById('loginResult').innerHTML = "Logging in...";
 
                 // Check if user exists locally
                 const storedUserData = localStorage.getItem('user_' + username);
@@ -308,7 +292,7 @@
                 document.getElementById('checkSeller').value = username;
                 
                 document.getElementById('loginResult').innerHTML = 
-                    '<span class="success">✅ Login successful!</span>';
+                    '<span class="success">Login successful!</span>';
                 
                 // Show app tab
                 document.getElementById('appTabBtn').style.display = 'inline-block';
@@ -321,7 +305,7 @@
             } catch (error) {
                 console.error('Login error:', error);
                 document.getElementById('loginResult').innerHTML = 
-                    '<span class="error">❌ Login failed: ' + error.message + '</span>';
+                    '<span class="error">Login failed: ' + error.message + '</span>';
             }
         }
 
@@ -341,32 +325,32 @@
             }
 
             try {
-                document.getElementById('transferResult').innerHTML = "⏳ Preparing transfer...";
-                document.getElementById('transferStatus').innerHTML = "⏳ Checking buyer...";
+                document.getElementById('transferResult').innerHTML = "Preparing transfer...";
+                document.getElementById('transferStatus').innerHTML = "Checking buyer...";
 
                 // First, verify the buyer exists
                 const buyerUser = await contract.getUserByPublicKey(buyerUsername);
                 document.getElementById('transferStatus').innerHTML = 
-                    `✅ Buyer found: ${buyerUser.name} (${getRoleName(buyerUser.role)})`;
+                    `Buyer found: ${buyerUser.name} (${getRoleName(buyerUser.role)})`;
 
                 // Check if transfer is allowed
-                document.getElementById('transferStatus').innerHTML += "<br>⏳ Checking transfer permissions...";
+                document.getElementById('transferStatus').innerHTML += "<br>Checking transfer permissions...";
                 const isAllowed = await contract.isSaleAllowedByPublicKey(currentUser.username, buyerUsername);
                 
                 if (!isAllowed) {
                     throw new Error(`Transfer not allowed: ${getRoleName(currentUser.role)} cannot sell to ${getRoleName(buyerUser.role)}`);
                 }
 
-                document.getElementById('transferStatus').innerHTML += "<br>✅ Transfer allowed!";
+                document.getElementById('transferStatus').innerHTML += "<br>Transfer allowed!";
 
                 // Execute the transfer using username
-                document.getElementById('transferStatus').innerHTML += "<br>⏳ Executing transfer...";
+                document.getElementById('transferStatus').innerHTML += "<br>Executing transfer...";
                 const tx = await contract.sellProductByPublicKey(buyerUsername, barcode);
                 await tx.wait();
 
                 document.getElementById('transferResult').innerHTML = 
-                    '<span class="success">✅ Product transferred successfully to ' + buyerUsername + '!</span>';
-                document.getElementById('transferStatus').innerHTML += "<br>✅ Transfer completed!";
+                    '<span class="success">Product transferred successfully to ' + buyerUsername + '!</span>';
+                document.getElementById('transferStatus').innerHTML += "<br>Transfer completed!";
                 
                 // Clear form
                 document.getElementById('transferBarcode').value = '';
@@ -375,7 +359,7 @@
             } catch (error) {
                 console.error('Transfer error:', error);
                 document.getElementById('transferResult').innerHTML = 
-                    '<span class="error">❌ Transfer failed: ' + error.message + '</span>';
+                    '<span class="error">Transfer failed: ' + error.message + '</span>';
                 document.getElementById('transferStatus').innerHTML = '';
             }
         }
@@ -391,7 +375,7 @@
             }
 
             try {
-                document.getElementById('permissionResult').innerHTML = "⏳ Checking...";
+                document.getElementById('permissionResult').innerHTML = "Checking...";
 
                 const isAllowed = await contract.isSaleAllowedByPublicKey(sellerUsername, buyerUsername);
                 
@@ -402,7 +386,7 @@
                 if (isAllowed) {
                     document.getElementById('permissionResult').innerHTML = `
                         <span class="success">
-                            ✅ Transfer ALLOWED<br>
+                            Transfer ALLOWED<br>
                             <strong>${sellerUser.name}</strong> (${getRoleName(sellerUser.role)}) → 
                             <strong>${buyerUser.name}</strong> (${getRoleName(buyerUser.role)})
                         </span>
@@ -410,7 +394,7 @@
                 } else {
                     document.getElementById('permissionResult').innerHTML = `
                         <span class="error">
-                            ❌ Transfer NOT ALLOWED<br>
+                            Transfer NOT ALLOWED<br>
                             <strong>${sellerUser.name}</strong> (${getRoleName(sellerUser.role)}) cannot sell to 
                             <strong>${buyerUser.name}</strong> (${getRoleName(buyerUser.role)})<br>
                             <small>Supply chain path: Manufacturer → Supplier → Vendor → Customer</small>
@@ -420,7 +404,7 @@
 
             } catch (error) {
                 document.getElementById('permissionResult').innerHTML = 
-                    '<span class="error">❌ Error: ' + error.message + '</span>';
+                    '<span class="error">Error: ' + error.message + '</span>';
             }
         }
 
@@ -455,7 +439,7 @@
                 const tx = await contract.registerProduct(name, manufacturerName, barcode, manufacturedTime);
                 await tx.wait();
                 document.getElementById('productResult').innerHTML = 
-                    '<span class="success">✅ Product registered successfully!</span>';
+                    '<span class="success">Product registered successfully!</span>';
                 
                 // Clear form
                 document.getElementById('productName').value = '';
@@ -464,7 +448,7 @@
                 document.getElementById('manufacturedTime').value = '';
             } catch (error) {
                 document.getElementById('productResult').innerHTML = 
-                    '<span class="error">❌ Error: ' + error.message + '</span>';
+                    '<span class="error">Error: ' + error.message + '</span>';
             }
         }
 
@@ -488,7 +472,7 @@
                 `;
             } catch (error) {
                 document.getElementById('productInfo').innerHTML = 
-                    '<span class="error">❌ Product not found</span>';
+                    '<span class="error">Product not found</span>';
             }
         }
 
@@ -517,13 +501,13 @@
                 `;
             } catch (error) {
                 document.getElementById('userInfo').innerHTML = 
-                    '<span class="error">❌ User not found</span>';
+                    '<span class="error">User not found</span>';
             }
         }
 
         // Initialize
         window.onload = function() {
-            // Optional: Implement "remember me" functionality here
+            // Implement "remember me" functionality here
         };
     </script>
 </body>

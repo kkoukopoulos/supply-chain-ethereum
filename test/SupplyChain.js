@@ -32,16 +32,16 @@ describe("SupplyChain with Database Logging", function () {
 
   describe("User Registration", function () {
     it("should register users with different roles and log to database", async function () {
-      await supplyChain.connect(manufacturer).registerUser("Manufacturer 1", 0);
+      await supplyChain.connect(manufacturer).registerUser("Manufacturer 1", 0, "0001");
       await DBTestHelper.logUserToDB(manufacturer.address, "Manufacturer 1", "Manufacturer");
 
-      await supplyChain.connect(supplier).registerUser("Supplier 1", 1);
+      await supplyChain.connect(supplier).registerUser("Supplier 1", 1, "0002");
       await DBTestHelper.logUserToDB(supplier.address, "Supplier 1", "Supplier");
 
-      await supplyChain.connect(vendor).registerUser("Vendor 1", 2);
+      await supplyChain.connect(vendor).registerUser("Vendor 1", 2, "0003");
       await DBTestHelper.logUserToDB(vendor.address, "Vendor 1", "Vendor");
 
-      await supplyChain.connect(customer).registerUser("Customer 1", 3);
+      await supplyChain.connect(customer).registerUser("Customer 1", 3, "0004");
       await DBTestHelper.logUserToDB(customer.address, "Customer 1", "Customer");
 
       const manufacturerUser = await supplyChain.returnUser(manufacturer.address);
@@ -56,10 +56,10 @@ describe("SupplyChain with Database Logging", function () {
     });
 
     it("should correctly identify manufacturer status", async function () {
-      await supplyChain.connect(manufacturer).registerUser("Manufacturer 1", 0);
+      await supplyChain.connect(manufacturer).registerUser("Manufacturer 1", 0, "0001");
       await DBTestHelper.logUserToDB(manufacturer.address, "Manufacturer 1", "Manufacturer");
       
-      await supplyChain.connect(customer).registerUser("Customer 1", 3);
+      await supplyChain.connect(customer).registerUser("Customer 1", 3, "0004");
       await DBTestHelper.logUserToDB(customer.address, "Customer 1", "Customer");
  
       const isManufacturer = await supplyChain.isUserManufacturer(manufacturer.address);
@@ -72,10 +72,10 @@ describe("SupplyChain with Database Logging", function () {
 
   describe("Product Registration", function () {
     beforeEach(async function () {
-      await supplyChain.connect(manufacturer).registerUser("Manufacturer 1", 0);
-      await supplyChain.connect(supplier).registerUser("Supplier 1", 1);
-      await supplyChain.connect(vendor).registerUser("Vendor 1", 2);
-      await supplyChain.connect(customer).registerUser("Customer 1", 3);
+      await supplyChain.connect(manufacturer).registerUser("Manufacturer 1", 0, "0001");
+      await supplyChain.connect(supplier).registerUser("Supplier 1", 1, "0002");
+      await supplyChain.connect(vendor).registerUser("Vendor 1", 2, "0003");
+      await supplyChain.connect(customer).registerUser("Customer 1", 3, "0004");
 
       await DBTestHelper.logUserToDB(manufacturer.address, "Manufacturer 1", "Manufacturer");
       await DBTestHelper.logUserToDB(supplier.address, "Supplier 1", "Supplier");
@@ -122,10 +122,10 @@ describe("SupplyChain with Database Logging", function () {
     const testBarcode = "0123456789";
 
     beforeEach(async function () {
-      await supplyChain.connect(manufacturer).registerUser("Manufacturer 1", 0);
-      await supplyChain.connect(supplier).registerUser("Supplier 1", 1);
-      await supplyChain.connect(vendor).registerUser("Vendor 1", 2);
-      await supplyChain.connect(customer).registerUser("Customer 1", 3);
+      await supplyChain.connect(manufacturer).registerUser("Manufacturer 1", 0, "0001");
+      await supplyChain.connect(supplier).registerUser("Supplier 1", 1, "0002");
+      await supplyChain.connect(vendor).registerUser("Vendor 1", 2, "0003");
+      await supplyChain.connect(customer).registerUser("Customer 1", 3, "0004");
 
       await DBTestHelper.logUserToDB(manufacturer.address, "Manufacturer 1", "Manufacturer");
       await DBTestHelper.logUserToDB(supplier.address, "Supplier 1", "Supplier");
@@ -208,10 +208,10 @@ describe("SupplyChain with Database Logging", function () {
     const testBarcode = "0123456789";
 
     beforeEach(async function () {
-      await supplyChain.connect(manufacturer).registerUser("Manufacturer 1", 0);
-      await supplyChain.connect(supplier).registerUser("Supplier 1", 1);
-      await supplyChain.connect(vendor).registerUser("Vendor 1", 2);
-      await supplyChain.connect(customer).registerUser("Customer 1", 3);
+      await supplyChain.connect(manufacturer).registerUser("Manufacturer 1", 0, "0001");
+      await supplyChain.connect(supplier).registerUser("Supplier 1", 1, "0002");
+      await supplyChain.connect(vendor).registerUser("Vendor 1", 2, "0003");
+      await supplyChain.connect(customer).registerUser("Customer 1", 3, "0004");
 
       await DBTestHelper.logUserToDB(manufacturer.address, "Manufacturer 1", "Manufacturer");
       await DBTestHelper.logUserToDB(supplier.address, "Supplier 1", "Supplier");
