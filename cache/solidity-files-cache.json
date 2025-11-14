@@ -2,8 +2,8 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "/home/kostas/supply-chain-ethereum/contracts/Products.sol": {
-      "lastModificationDate": 1762789963306,
-      "contentHash": "863e3d25551e27e5781a0761da0ea039",
+      "lastModificationDate": 1763137724400,
+      "contentHash": "b6046940af70ecf5fe93a324d05ab0ef",
       "sourceName": "contracts/Products.sol",
       "solcConfig": {
         "version": "0.8.30",
@@ -41,7 +41,7 @@
       ]
     },
     "/home/kostas/supply-chain-ethereum/contracts/Types.sol": {
-      "lastModificationDate": 1762789963307,
+      "lastModificationDate": 1762870918868,
       "contentHash": "0a248a6ebf31fbd886f1d517d36759ac",
       "sourceName": "contracts/Types.sol",
       "solcConfig": {
@@ -77,7 +77,7 @@
       ]
     },
     "/home/kostas/supply-chain-ethereum/contracts/Users.sol": {
-      "lastModificationDate": 1762789963307,
+      "lastModificationDate": 1762870918868,
       "contentHash": "c86254e30c63155f226f3969d56f300d",
       "sourceName": "contracts/Users.sol",
       "solcConfig": {
@@ -115,7 +115,7 @@
       ]
     },
     "/home/kostas/supply-chain-ethereum/contracts/SupplyChain.sol": {
-      "lastModificationDate": 1762790628046,
+      "lastModificationDate": 1762870918868,
       "contentHash": "bef33edd16f6b804458003487300e7ff",
       "sourceName": "contracts/SupplyChain.sol",
       "solcConfig": {

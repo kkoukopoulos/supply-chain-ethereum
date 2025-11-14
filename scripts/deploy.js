@@ -22,7 +22,7 @@ async function main() {
   // Connect contracts
   await products.setUsersContract(await users.getAddress());
 
-  console.log("\nDeployment Complete!");
+  console.log("\nDeployment Complete");
   console.log("Users:", await users.getAddress());
   console.log("Products:", await products.getAddress());
   console.log("SupplyChain:", await supplyChain.getAddress());

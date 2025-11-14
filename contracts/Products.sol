@@ -29,7 +29,7 @@ contract Products {
 
     modifier onlyManufacturer(address _manufacturer) {
         Types.User memory user = users.getUser(_manufacturer);
-        require(user.role == Types.UserRole.Manufacturer, "Only manufacturer can add products.");
+        require(user.role == Types.UserRole.Manufacturer, "Only manufacturer can add products");
         require(bytes(user.name).length > 0, "User not registered");
         _;
     }
