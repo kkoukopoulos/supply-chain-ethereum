@@ -93,4 +93,29 @@ contract SupplyChain {
         
         return false;
     }
+
+    function getUserInventory(address user) external view returns (string[] memory) {
+        return products.getUserInventory(user);
+    }
+
+    function getUserInventoryWithDetails(address user) external view returns (Types.Product[] memory) {
+        return products.getUserInventoryWithDetails(user);
+    }
+
+    function getUserInventoryByPublicKey(string memory publicKey) external view returns (string[] memory) {
+        Types.User memory userData = users.getUserByPublicKey(publicKey);
+        require(userData.userAddress != address(0), "User not found");
+        return products.getUserInventory(userData.userAddress);
+    }
+
+    function getUserInventoryWithDetailsByPublicKey(string memory publicKey) external view returns (Types.Product[] memory) {
+        Types.User memory userData = users.getUserByPublicKey(publicKey);
+        require(userData.userAddress != address(0), "User not found");
+        return products.getUserInventoryWithDetails(userData.userAddress);
+    }
+
+    // NEW FUNCTION: Get product by barcode (wrapper for Products contract function)
+    function getProductByBarcode(string memory _barcode) external view returns (Types.Product memory) {
+        return products.getProductByBarcode(_barcode);
+    }
 }

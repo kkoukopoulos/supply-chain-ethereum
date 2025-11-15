@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Supply Chain DApp</title>
+    <title>Supply Chain DApp - Pure Blockchain</title>
     <script src="https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
@@ -13,10 +13,18 @@
         .tab { display: none; }
         .active { display: block; }
         .info-box { background: #f0f8ff; padding: 10px; border-radius: 5px; margin: 10px 0; }
+        .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 5px; margin: 10px 0; }
+        .inventory-item { border: 1px solid #ddd; padding: 10px; margin: 5px 0; border-radius: 3px; }
+        .inventory-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin: 10px 0; }
     </style>
 </head>
 <body>
-    <h1>Supply Chain Management</h1>
+    <h1>Supply Chain Management - Pure Blockchain</h1>
+
+    <div class="warning">
+        <strong>Pure Blockchain DApp</strong><br>
+        No backend server or database required. Everything stored on-chain!
+    </div>
 
     <!-- Navigation -->
     <div style="margin-bottom: 20px;">
@@ -68,6 +76,23 @@
             <button onclick="logout()" style="background: #dc3545;">Logout</button>
         </div>
 
+        <!-- My Inventory Section -->
+        <div class="section">
+            <h3>My Inventory</h3>
+            <button onclick="loadMyInventory()">Refresh My Inventory</button>
+            <button onclick="loadMyInventoryWithDetails()">Show Detailed Inventory</button>
+            <div id="myInventory"></div>
+        </div>
+
+        <!-- User Inventory Lookup Section -->
+        <div class="section">
+            <h3>Lookup User Inventory</h3>
+            <input type="text" id="inventoryUsername" placeholder="Enter username to check their inventory">
+            <button onclick="lookupUserInventory()">Check Inventory</button>
+            <button onclick="lookupUserInventoryWithDetails()">Check Detailed Inventory</button>
+            <div id="userInventoryResult"></div>
+        </div>
+
         <div class="section">
             <h3>Register Product</h3>
             <input type="text" id="productName" placeholder="Product name">
@@ -114,7 +139,7 @@
     </div>
 
     <script>
-        // Contract configuration
+        // Contract configuration - UPDATED ABI
         const CONTRACT_ADDRESS = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0";
         const CONTRACT_ABI = [
             "function registerUser(string name, uint8 role, string publicKey) public",
@@ -124,7 +149,13 @@
             "function getUserByPublicKey(string publicKey) external view returns (tuple(address userAddress, string name, uint8 role, string publicKey))",
             "function getProductByBarcode(string barcode) public view returns (tuple(string name, string manufacturerName, string barcode, string manufacturedTime))",
             "function returnUser(address addr) external view returns (tuple(address userAddress, string name, uint8 role, string publicKey))",
-            "function isSaleAllowedByPublicKey(string sellerPublicKey, string buyerPublicKey) external view returns (bool)"
+            "function isSaleAllowedByPublicKey(string sellerPublicKey, string buyerPublicKey) external view returns (bool)",
+            // NEW INVENTORY FUNCTIONS
+            "function getUserInventory(address user) external view returns (string[] memory)",
+            "function getUserInventoryWithDetails(address user) external view returns (tuple(string name, string manufacturerName, string barcode, string manufacturedTime)[] memory)",
+            "function getUserInventoryByPublicKey(string publicKey) external view returns (string[] memory)",
+            "function getUserInventoryWithDetailsByPublicKey(string publicKey) external view returns (tuple(string name, string manufacturerName, string barcode, string manufacturedTime)[] memory)",
+            "function getProductByBarcode(string barcode) public view returns (tuple(string name, string manufacturerName, string barcode, string manufacturedTime))",
         ];
 
         let provider, wallet, contract, currentUser;
@@ -143,7 +174,6 @@
         }
 
         // Register user with custom username
-        // Register user with custom username - FIXED VERSION
         async function registerUser() {
             const username = document.getElementById('regUsername').value.trim();
             const password = document.getElementById('regPassword').value;
@@ -174,7 +204,7 @@
                 // Connect to blockchain
                 provider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
                 
-                // Generate a new wallet for the user (this will be used for both registration and login)
+                // Generate a new wallet for the user
                 const userWallet = ethers.Wallet.createRandom().connect(provider);
                 
                 // Pick a funded account to send ETH to the new user wallet
@@ -185,7 +215,7 @@
                 document.getElementById('regResult').innerHTML = "Funding your wallet...";
                 const fundTx = await fundedWallet.sendTransaction({
                     to: userWallet.address,
-                    value: ethers.utils.parseEther("0.01") // Send 0.01 ETH for gas
+                    value: ethers.utils.parseEther("0.01")
                 });
                 await fundTx.wait();
 
@@ -225,9 +255,9 @@
                 if (errorMessage.includes("Public key already registered")) {
                     errorMessage = "Username already taken! Please choose a different username.";
                 } else if (errorMessage.includes("user rejected transaction")) {
-                    errorMessage = "Transaction was rejected. Please make sure you have enough ETH for gas.";
+                    errorMessage = "Transaction was rejected.";
                 } else if (errorMessage.includes("insufficient funds")) {
-                    errorMessage = "Insufficient funds for gas. The test account might be out of ETH.";
+                    errorMessage = "Insufficient funds for gas.";
                 }
                 
                 document.getElementById('regResult').innerHTML = 
@@ -268,10 +298,9 @@
                 wallet = new ethers.Wallet(userData.privateKey, provider);
                 contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, wallet);
 
-                // SIMPLE VERIFICATION: Just check if user exists on blockchain
+                // Verify user exists on blockchain
                 const blockchainUser = await contract.getUserByPublicKey(username);
                 
-                // Check if user was found (non-zero address)
                 if (blockchainUser.userAddress === "0x0000000000000000000000000000000000000000") {
                     throw new Error("User not found on blockchain");
                 }
@@ -302,6 +331,9 @@
                 document.getElementById('loginUsername').value = '';
                 document.getElementById('loginPassword').value = '';
 
+                // Auto-load user's inventory on login
+                loadMyInventory();
+
             } catch (error) {
                 console.error('Login error:', error);
                 document.getElementById('loginResult').innerHTML = 
@@ -309,7 +341,215 @@
             }
         }
 
-        // NEW: Transfer product using buyer's username
+        // Load current user's inventory
+        async function loadMyInventory() {
+            if (!contract || !currentUser) {
+                alert("Please login first!");
+                return;
+            }
+
+            try {
+                document.getElementById('myInventory').innerHTML = "Loading your inventory...";
+                
+                const inventory = await contract.getUserInventory(wallet.address);
+                
+                if (inventory.length === 0) {
+                    document.getElementById('myInventory').innerHTML = 
+                        '<div class="info-box">Your inventory is empty. Register some products to get started!</div>';
+                    return;
+                }
+
+                let html = `<h4>Your Products (${inventory.length} items):</h4>`;
+                html += '<div class="inventory-grid">';
+                
+                for (let i = 0; i < inventory.length; i++) {
+                    html += `
+                        <div class="inventory-item">
+                            <strong>Barcode:</strong> ${inventory[i]}<br>
+                            <button onclick="lookupProductByBarcode('${inventory[i]}')">View Details</button>
+                        </div>
+                    `;
+                }
+                
+                html += '</div>';
+                document.getElementById('myInventory').innerHTML = html;
+
+            } catch (error) {
+                console.error('Inventory load error:', error);
+                document.getElementById('myInventory').innerHTML = 
+                    '<span class="error">Failed to load inventory: ' + error.message + '</span>';
+            }
+        }
+
+        // Load current user's inventory with details
+        async function loadMyInventoryWithDetails() {
+            if (!contract || !currentUser) {
+                alert("Please login first!");
+                return;
+            }
+
+            try {
+                document.getElementById('myInventory').innerHTML = "Loading detailed inventory...";
+                
+                const inventoryDetails = await contract.getUserInventoryWithDetails(wallet.address);
+                
+                if (inventoryDetails.length === 0) {
+                    document.getElementById('myInventory').innerHTML = 
+                        '<div class="info-box">Your inventory is empty. Register some products to get started!</div>';
+                    return;
+                }
+
+                let html = `<h4>Your Detailed Inventory (${inventoryDetails.length} items):</h4>`;
+                html += '<div class="inventory-grid">';
+                
+                for (let i = 0; i < inventoryDetails.length; i++) {
+                    const product = inventoryDetails[i];
+                    html += `
+                        <div class="inventory-item">
+                            <strong>${product.name}</strong><br>
+                            <strong>Barcode:</strong> ${product.barcode}<br>
+                            <strong>Manufacturer:</strong> ${product.manufacturerName}<br>
+                            <strong>Manufactured:</strong> ${product.manufacturedTime}<br>
+                            <button onclick="lookupProductByBarcode('${product.barcode}')">Full Details</button>
+                        </div>
+                    `;
+                }
+                
+                html += '</div>';
+                document.getElementById('myInventory').innerHTML = html;
+
+            } catch (error) {
+                console.error('Detailed inventory load error:', error);
+                document.getElementById('myInventory').innerHTML = 
+                    '<span class="error">Failed to load detailed inventory: ' + error.message + '</span>';
+            }
+        }
+
+        // Lookup user inventory by username
+        async function lookupUserInventory() {
+            if (!contract) {
+                alert("Please login first!");
+                return;
+            }
+
+            const username = document.getElementById('inventoryUsername').value.trim();
+            
+            if (!username) {
+                alert("Please enter a username");
+                return;
+            }
+
+            try {
+                document.getElementById('userInventoryResult').innerHTML = `Loading inventory for ${username}...`;
+                
+                const inventory = await contract.getUserInventoryByPublicKey(username);
+                
+                if (inventory.length === 0) {
+                    document.getElementById('userInventoryResult').innerHTML = 
+                        `<div class="info-box">${username}'s inventory is empty.</div>`;
+                    return;
+                }
+
+                let html = `<h4>${username}'s Inventory (${inventory.length} items):</h4>`;
+                html += '<div class="inventory-grid">';
+                
+                for (let i = 0; i < inventory.length; i++) {
+                    html += `
+                        <div class="inventory-item">
+                            <strong>Barcode:</strong> ${inventory[i]}<br>
+                            <button onclick="lookupProductByBarcode('${inventory[i]}')">View Details</button>
+                        </div>
+                    `;
+                }
+                
+                html += '</div>';
+                document.getElementById('userInventoryResult').innerHTML = html;
+
+            } catch (error) {
+                console.error('User inventory lookup error:', error);
+                document.getElementById('userInventoryResult').innerHTML = 
+                    '<span class="error">Failed to load user inventory: ' + error.message + '</span>';
+            }
+        }
+
+        // Lookup user inventory with details by username
+        async function lookupUserInventoryWithDetails() {
+            if (!contract) {
+                alert("Please login first!");
+                return;
+            }
+
+            const username = document.getElementById('inventoryUsername').value.trim();
+            
+            if (!username) {
+                alert("Please enter a username");
+                return;
+            }
+
+            try {
+                document.getElementById('userInventoryResult').innerHTML = `Loading detailed inventory for ${username}...`;
+                
+                const inventoryDetails = await contract.getUserInventoryWithDetailsByPublicKey(username);
+                
+                if (inventoryDetails.length === 0) {
+                    document.getElementById('userInventoryResult').innerHTML = 
+                        `<div class="info-box">${username}'s inventory is empty.</div>`;
+                    return;
+                }
+
+                let html = `<h4>${username}'s Detailed Inventory (${inventoryDetails.length} items):</h4>`;
+                html += '<div class="inventory-grid">';
+                
+                for (let i = 0; i < inventoryDetails.length; i++) {
+                    const product = inventoryDetails[i];
+                    html += `
+                        <div class="inventory-item">
+                            <strong>${product.name}</strong><br>
+                            <strong>Barcode:</strong> ${product.barcode}<br>
+                            <strong>Manufacturer:</strong> ${product.manufacturerName}<br>
+                            <strong>Manufactured:</strong> ${product.manufacturedTime}<br>
+                            <button onclick="lookupProductByBarcode('${product.barcode}')">Full Details</button>
+                        </div>
+                    `;
+                }
+                
+                html += '</div>';
+                document.getElementById('userInventoryResult').innerHTML = html;
+
+            } catch (error) {
+                console.error('User detailed inventory lookup error:', error);
+                document.getElementById('userInventoryResult').innerHTML = 
+                    '<span class="error">Failed to load user detailed inventory: ' + error.message + '</span>';
+            }
+        }
+
+        // Helper function: Lookup product by barcode and display in product info section
+        async function lookupProductByBarcode(barcode) {
+            if (!contract) {
+                alert("Please login first!");
+                return;
+            }
+
+            try {
+                document.getElementById('productInfo').innerHTML = `Loading product ${barcode}...`;
+                
+                const product = await contract.getProductByBarcode(barcode);
+                document.getElementById('productInfo').innerHTML = `
+                    <h4>Product Details:</h4>
+                    <div class="info-box">
+                        <p><strong>Name:</strong> ${product.name}</p>
+                        <p><strong>Manufacturer:</strong> ${product.manufacturerName}</p>
+                        <p><strong>Barcode:</strong> ${product.barcode}</p>
+                        <p><strong>Manufactured:</strong> ${product.manufacturedTime}</p>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('productInfo').innerHTML = 
+                    '<span class="error">Product not found: ' + barcode + '</span>';
+            }
+        }
+
+        // Transfer product using buyer's username
         async function transferProductByUsername() {
             if (!contract) {
                 alert("Please login first!");
@@ -355,6 +595,9 @@
                 // Clear form
                 document.getElementById('transferBarcode').value = '';
                 document.getElementById('buyerUsername').value = '';
+
+                // Refresh inventory after transfer
+                loadMyInventory();
 
             } catch (error) {
                 console.error('Transfer error:', error);
@@ -414,15 +657,6 @@
             return roles[roleValue] || 'Unknown';
         }
 
-        // Logout
-        function logout() {
-            wallet = null;
-            contract = null;
-            currentUser = null;
-            document.getElementById('appTabBtn').style.display = 'none';
-            showTab('loginTab');
-        }
-
         // Product registration
         async function registerProduct() {
             if (!contract) {
@@ -446,6 +680,10 @@
                 document.getElementById('manufacturerName').value = '';
                 document.getElementById('barcode').value = '';
                 document.getElementById('manufacturedTime').value = '';
+
+                // Refresh inventory after registering new product
+                loadMyInventory();
+
             } catch (error) {
                 document.getElementById('productResult').innerHTML = 
                     '<span class="error">Error: ' + error.message + '</span>';
@@ -465,10 +703,12 @@
                 const product = await contract.getProductByBarcode(barcode);
                 document.getElementById('productInfo').innerHTML = `
                     <h4>Product Details:</h4>
-                    <p><strong>Name:</strong> ${product.name}</p>
-                    <p><strong>Manufacturer:</strong> ${product.manufacturerName}</p>
-                    <p><strong>Barcode:</strong> ${product.barcode}</p>
-                    <p><strong>Manufactured:</strong> ${product.manufacturedTime}</p>
+                    <div class="info-box">
+                        <p><strong>Name:</strong> ${product.name}</p>
+                        <p><strong>Manufacturer:</strong> ${product.manufacturerName}</p>
+                        <p><strong>Barcode:</strong> ${product.barcode}</p>
+                        <p><strong>Manufactured:</strong> ${product.manufacturedTime}</p>
+                    </div>
                 `;
             } catch (error) {
                 document.getElementById('productInfo').innerHTML = 
@@ -494,10 +734,12 @@
                 const user = await contract.getUserByPublicKey(username);
                 document.getElementById('userInfo').innerHTML = `
                     <h4>User Details:</h4>
-                    <p><strong>Username:</strong> ${user.publicKey}</p>
-                    <p><strong>Name:</strong> ${user.name}</p>
-                    <p><strong>Address:</strong> ${user.userAddress}</p>
-                    <p><strong>Role:</strong> ${getRoleName(user.role)}</p>
+                    <div class="info-box">
+                        <p><strong>Username:</strong> ${user.publicKey}</p>
+                        <p><strong>Name:</strong> ${user.name}</p>
+                        <p><strong>Address:</strong> ${user.userAddress}</p>
+                        <p><strong>Role:</strong> ${getRoleName(user.role)}</p>
+                    </div>
                 `;
             } catch (error) {
                 document.getElementById('userInfo').innerHTML = 
@@ -505,9 +747,18 @@
             }
         }
 
+        // Logout
+        function logout() {
+            wallet = null;
+            contract = null;
+            currentUser = null;
+            document.getElementById('appTabBtn').style.display = 'none';
+            showTab('loginTab');
+        }
+
         // Initialize
         window.onload = function() {
-            // Implement "remember me" functionality here
+            console.log("Supply Chain DApp loaded - Pure Blockchain Version");
         };
     </script>
 </body>

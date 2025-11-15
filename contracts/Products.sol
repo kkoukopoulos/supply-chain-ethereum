@@ -158,4 +158,19 @@ contract Products {
         Types.User memory userData = users.getUser(user);
         return userData.role == Types.UserRole.Manufacturer;
     }
+
+    function getUserInventory(address user) public view returns (string[] memory) {
+        return userProducts[user];
+    }
+
+    function getUserInventoryWithDetails(address user) public view returns (Types.Product[] memory) {
+        string[] memory barcodes = userProducts[user];
+        Types.Product[] memory inventory = new Types.Product[](barcodes.length);
+        
+        for (uint i = 0; i < barcodes.length; i++) {
+            inventory[i] = barcodeToProduct[barcodes[i]];
+        }
+        
+        return inventory;
+    }
 }
