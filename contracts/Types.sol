@@ -21,10 +21,6 @@ library Types {
         string manufacturerName;
         string barcode;
         string manufacturedTime;
-    }
-
-    struct ProductHistory {
-        address owner;
-        uint256 timestamp;
+        uint256 volume;
     }
 }

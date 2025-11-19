@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Supply Chain DApp - Pure Blockchain</title>
+    <title>Supply Chain DApp - Volume Based</title>
     <script src="https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
@@ -19,11 +19,11 @@
     </style>
 </head>
 <body>
-    <h1>Supply Chain Management - Pure Blockchain</h1>
+    <h1>Supply Chain Management - Volume Based</h1>
 
     <div class="warning">
-        <strong>Pure Blockchain DApp</strong><br>
-        No backend server or database required. Everything stored on-chain!
+        <strong>Volume-Based Supply Chain</strong><br>
+        All product transfers now require specifying volume amount!
     </div>
 
     <!-- Navigation -->
@@ -37,8 +37,6 @@
     <div id="registerTab" class="tab active">
         <div class="section">
             <h2>Register New User</h2>
-
-            <h3>User Information</h3>
             <input type="text" id="regUsername" placeholder="Choose your username (e.g., john_doe, acme_corp)">
             <input type="password" id="regPassword" placeholder="Set password (for local security)">
             <input type="text" id="regName" placeholder="Your full name or company name">
@@ -58,7 +56,6 @@
     <div id="loginTab" class="tab">
         <div class="section">
             <h2>Login with Username</h2>
-
             <input type="text" id="loginUsername" placeholder="Your username">
             <input type="password" id="loginPassword" placeholder="Your password">
             <button onclick="loginUser()">Login</button>
@@ -93,21 +90,24 @@
             <div id="userInventoryResult"></div>
         </div>
 
+        <!-- Register Product Section -->
         <div class="section">
             <h3>Register Product</h3>
             <input type="text" id="productName" placeholder="Product name">
             <input type="text" id="manufacturerName" placeholder="Manufacturer name">
             <input type="text" id="barcode" placeholder="Barcode">
             <input type="text" id="manufacturedTime" placeholder="Manufactured time (YYYY-MM-DD)">
+            <input type="number" id="productVolume" placeholder="Product volume" min="1">
             <button onclick="registerProduct()">Register Product</button>
             <div id="productResult"></div>
         </div>
 
+        <!-- Transfer Product Section -->
         <div class="section">
-            <h3>Transfer Product to User</h3>
-            
+            <h3>Transfer Product</h3>
             <input type="text" id="transferBarcode" placeholder="Product barcode">
             <input type="text" id="buyerUsername" placeholder="Buyer's username">
+            <input type="number" id="transferVolume" placeholder="Volume to transfer" min="1">
             <button onclick="transferProductByUsername()">Transfer Product</button>
             <div id="transferResult"></div>
             
@@ -115,6 +115,7 @@
             <div id="transferStatus" style="margin-top: 10px;"></div>
         </div>
 
+        <!-- Lookup Product Section -->
         <div class="section">
             <h3>Lookup Product</h3>
             <input type="text" id="lookupBarcode" placeholder="Enter barcode">
@@ -122,6 +123,7 @@
             <div id="productInfo"></div>
         </div>
 
+        <!-- Lookup User Section -->
         <div class="section">
             <h3>Lookup User by Username</h3>
             <input type="text" id="lookupUsername" placeholder="Enter username">
@@ -129,6 +131,7 @@
             <div id="userInfo"></div>
         </div>
 
+        <!-- Check Transfer Permission Section -->
         <div class="section">
             <h3>Check Transfer Permission</h3>
             <input type="text" id="checkSeller" placeholder="Seller username (optional)" value="">
@@ -139,23 +142,30 @@
     </div>
 
     <script>
-        // Contract configuration - UPDATED ABI
+        // Contract configuration - UPDATED ABI with volume parameters
         const CONTRACT_ADDRESS = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0";
         const CONTRACT_ABI = [
             "function registerUser(string name, uint8 role, string publicKey) public",
-            "function registerProduct(string name, string manufacturerName, string barcode, string manufacturedTime) external",
-            "function sellProduct(address buyer, string barcode) external",
-            "function sellProductByPublicKey(string buyerPublicKey, string barcode) external",
+            // UPDATED: Added volume parameter
+            "function registerProduct(string name, string manufacturerName, string barcode, string manufacturedTime, uint256 volume) external",
+            // UPDATED: Added volume parameter
+            "function sellProduct(address buyer, string barcode, uint256 volume) external",
+            // UPDATED: Added volume parameter
+            "function sellProductByPublicKey(string buyerPublicKey, string barcode, uint256 volume) external",
             "function getUserByPublicKey(string publicKey) external view returns (tuple(address userAddress, string name, uint8 role, string publicKey))",
-            "function getProductByBarcode(string barcode) public view returns (tuple(string name, string manufacturerName, string barcode, string manufacturedTime))",
+            // UPDATED: Product struct now includes volume
+            "function getProductByBarcode(string barcode) public view returns (tuple(string name, string manufacturerName, string barcode, string manufacturedTime, uint256 volume))",
             "function returnUser(address addr) external view returns (tuple(address userAddress, string name, uint8 role, string publicKey))",
             "function isSaleAllowedByPublicKey(string sellerPublicKey, string buyerPublicKey) external view returns (bool)",
-            // NEW INVENTORY FUNCTIONS
+            // UPDATED: Inventory functions now return products with volume
             "function getUserInventory(address user) external view returns (string[] memory)",
-            "function getUserInventoryWithDetails(address user) external view returns (tuple(string name, string manufacturerName, string barcode, string manufacturedTime)[] memory)",
+            "function getUserInventoryWithDetails(address user) external view returns (tuple(string name, string manufacturerName, string barcode, string manufacturedTime, uint256 volume)[] memory)",
             "function getUserInventoryByPublicKey(string publicKey) external view returns (string[] memory)",
-            "function getUserInventoryWithDetailsByPublicKey(string publicKey) external view returns (tuple(string name, string manufacturerName, string barcode, string manufacturedTime)[] memory)",
-            "function getProductByBarcode(string barcode) public view returns (tuple(string name, string manufacturerName, string barcode, string manufacturedTime))",
+            "function getUserInventoryWithDetailsByPublicKey(string publicKey) external view returns (tuple(string name, string manufacturerName, string barcode, string manufacturedTime, uint256 volume)[] memory)",
+            "function getProductByBarcode(string barcode) public view returns (tuple(string name, string manufacturerName, string barcode, string manufacturedTime, uint256 volume))",
+            // NEW: Volume functions
+            "function getUserTotalVolume(address user) external view returns (uint256)",
+            "function getUserTotalVolumeByPublicKey(string publicKey) external view returns (uint256)"
         ];
 
         let provider, wallet, contract, currentUser;
@@ -180,7 +190,6 @@
             const name = document.getElementById('regName').value.trim();
             const role = document.getElementById('regRole').value;
 
-            // Validation
             if (!username) {
                 alert("Please choose a username!");
                 return;
@@ -201,17 +210,13 @@
             try {
                 document.getElementById('regResult').innerHTML = "Creating your account...";
 
-                // Connect to blockchain
                 provider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
                 
-                // Generate a new wallet for the user
                 const userWallet = ethers.Wallet.createRandom().connect(provider);
                 
-                // Pick a funded account to send ETH to the new user wallet
                 const randomIndex = Math.floor(Math.random() * fundedPrivateKeys.length);
                 const fundedWallet = new ethers.Wallet(fundedPrivateKeys[randomIndex], provider);
                 
-                // Fund the user's wallet with a small amount of ETH for gas
                 document.getElementById('regResult').innerHTML = "Funding your wallet...";
                 const fundTx = await fundedWallet.sendTransaction({
                     to: userWallet.address,
@@ -219,15 +224,12 @@
                 });
                 await fundTx.wait();
 
-                // Create contract instance with the user's wallet
                 const userContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, userWallet);
                 
-                // Register user on blockchain using THEIR OWN wallet
                 document.getElementById('regResult').innerHTML = "Registering on blockchain...";
                 const tx = await userContract.registerUser(name, role, username);
                 await tx.wait();
 
-                // Store user credentials locally
                 const userData = {
                     address: userWallet.address,
                     privateKey: userWallet.privateKey,
@@ -239,11 +241,9 @@
                 localStorage.setItem('user_' + username, btoa(JSON.stringify(userData)));
                 localStorage.setItem('password_' + username, btoa(password));
 
-                // Show success
                 document.getElementById('regResult').innerHTML = 
                     '<span class="success">Registration successful! You can now login.</span>';
 
-                // Clear form
                 document.getElementById('regUsername').value = '';
                 document.getElementById('regPassword').value = '';
                 document.getElementById('regName').value = '';
@@ -277,7 +277,6 @@
             try {
                 document.getElementById('loginResult').innerHTML = "Logging in...";
 
-                // Check if user exists locally
                 const storedUserData = localStorage.getItem('user_' + username);
                 const storedPassword = localStorage.getItem('password_' + username);
 
@@ -285,53 +284,43 @@
                     throw new Error("User not found. Please register first.");
                 }
 
-                // Verify password
                 if (btoa(password) !== storedPassword) {
                     throw new Error("Invalid password");
                 }
 
-                // Get user data
                 const userData = JSON.parse(atob(storedUserData));
 
-                // Connect to blockchain with user's private key
                 provider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
                 wallet = new ethers.Wallet(userData.privateKey, provider);
                 contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, wallet);
 
-                // Verify user exists on blockchain
                 const blockchainUser = await contract.getUserByPublicKey(username);
                 
                 if (blockchainUser.userAddress === "0x0000000000000000000000000000000000000000") {
                     throw new Error("User not found on blockchain");
                 }
 
-                // Set current user
                 currentUser = {
                     ...userData,
                     blockchainData: blockchainUser
                 };
 
-                // Update UI
                 document.getElementById('userWelcome').textContent = userData.name;
                 document.getElementById('displayUsername').textContent = username;
                 document.getElementById('userAddress').textContent = wallet.address;
                 document.getElementById('userRole').textContent = getRoleName(userData.role);
                 
-                // Pre-fill the seller field in permission check
                 document.getElementById('checkSeller').value = username;
                 
                 document.getElementById('loginResult').innerHTML = 
                     '<span class="success">Login successful!</span>';
                 
-                // Show app tab
                 document.getElementById('appTabBtn').style.display = 'inline-block';
                 showTab('appTab');
 
-                // Clear login form
                 document.getElementById('loginUsername').value = '';
                 document.getElementById('loginPassword').value = '';
 
-                // Auto-load user's inventory on login
                 loadMyInventory();
 
             } catch (error) {
@@ -410,6 +399,7 @@
                             <strong>Barcode:</strong> ${product.barcode}<br>
                             <strong>Manufacturer:</strong> ${product.manufacturerName}<br>
                             <strong>Manufactured:</strong> ${product.manufacturedTime}<br>
+                            <strong>Volume:</strong> ${product.volume}<br>
                             <button onclick="lookupProductByBarcode('${product.barcode}')">Full Details</button>
                         </div>
                     `;
@@ -508,6 +498,7 @@
                             <strong>Barcode:</strong> ${product.barcode}<br>
                             <strong>Manufacturer:</strong> ${product.manufacturerName}<br>
                             <strong>Manufactured:</strong> ${product.manufacturedTime}<br>
+                            <strong>Volume:</strong> ${product.volume}<br>
                             <button onclick="lookupProductByBarcode('${product.barcode}')">Full Details</button>
                         </div>
                     `;
@@ -541,6 +532,7 @@
                         <p><strong>Manufacturer:</strong> ${product.manufacturerName}</p>
                         <p><strong>Barcode:</strong> ${product.barcode}</p>
                         <p><strong>Manufactured:</strong> ${product.manufacturedTime}</p>
+                        <p><strong>Volume:</strong> ${product.volume}</p>
                     </div>
                 `;
             } catch (error) {
@@ -549,7 +541,7 @@
             }
         }
 
-        // Transfer product using buyer's username
+        // Transfer product using buyer's username with volume
         async function transferProductByUsername() {
             if (!contract) {
                 alert("Please login first!");
@@ -558,9 +550,10 @@
 
             const barcode = document.getElementById('transferBarcode').value.trim();
             const buyerUsername = document.getElementById('buyerUsername').value.trim();
+            const volume = document.getElementById('transferVolume').value;
 
-            if (!barcode || !buyerUsername) {
-                alert("Please enter both product barcode and buyer username");
+            if (!barcode || !buyerUsername || !volume) {
+                alert("Please enter product barcode, buyer username, and volume");
                 return;
             }
 
@@ -583,9 +576,9 @@
 
                 document.getElementById('transferStatus').innerHTML += "<br>Transfer allowed!";
 
-                // Execute the transfer using username
+                // Execute the transfer using username with volume
                 document.getElementById('transferStatus').innerHTML += "<br>Executing transfer...";
-                const tx = await contract.sellProductByPublicKey(buyerUsername, barcode);
+                const tx = await contract.sellProductByPublicKey(buyerUsername, barcode, volume);
                 await tx.wait();
 
                 document.getElementById('transferResult').innerHTML = 
@@ -595,6 +588,7 @@
                 // Clear form
                 document.getElementById('transferBarcode').value = '';
                 document.getElementById('buyerUsername').value = '';
+                document.getElementById('transferVolume').value = '';
 
                 // Refresh inventory after transfer
                 loadMyInventory();
@@ -651,13 +645,7 @@
             }
         }
 
-        // Helper function to get role name
-        function getRoleName(roleValue) {
-            const roles = ['Manufacturer', 'Supplier', 'Vendor', 'Customer'];
-            return roles[roleValue] || 'Unknown';
-        }
-
-        // Product registration
+        // Product registration with volume
         async function registerProduct() {
             if (!contract) {
                 alert("Please login first!");
@@ -668,9 +656,15 @@
             const manufacturerName = document.getElementById('manufacturerName').value;
             const barcode = document.getElementById('barcode').value;
             const manufacturedTime = document.getElementById('manufacturedTime').value;
+            const volume = document.getElementById('productVolume').value;
+
+            if (!volume || volume < 1) {
+                alert("Please enter a valid volume (minimum 1)");
+                return;
+            }
 
             try {
-                const tx = await contract.registerProduct(name, manufacturerName, barcode, manufacturedTime);
+                const tx = await contract.registerProduct(name, manufacturerName, barcode, manufacturedTime, volume);
                 await tx.wait();
                 document.getElementById('productResult').innerHTML = 
                     '<span class="success">Product registered successfully!</span>';
@@ -680,6 +674,7 @@
                 document.getElementById('manufacturerName').value = '';
                 document.getElementById('barcode').value = '';
                 document.getElementById('manufacturedTime').value = '';
+                document.getElementById('productVolume').value = '';
 
                 // Refresh inventory after registering new product
                 loadMyInventory();
@@ -708,6 +703,7 @@
                         <p><strong>Manufacturer:</strong> ${product.manufacturerName}</p>
                         <p><strong>Barcode:</strong> ${product.barcode}</p>
                         <p><strong>Manufactured:</strong> ${product.manufacturedTime}</p>
+                        <p><strong>Volume:</strong> ${product.volume}</p>
                     </div>
                 `;
             } catch (error) {
@@ -747,6 +743,12 @@
             }
         }
 
+        // Helper function to get role name
+        function getRoleName(roleValue) {
+            const roles = ['Manufacturer', 'Supplier', 'Vendor', 'Customer'];
+            return roles[roleValue] || 'Unknown';
+        }
+
         // Logout
         function logout() {
             wallet = null;
@@ -758,7 +760,7 @@
 
         // Initialize
         window.onload = function() {
-            console.log("Supply Chain DApp loaded - Pure Blockchain Version");
+            console.log("Supply Chain DApp loaded - Volume Based Version");
         };
     </script>
 </body>

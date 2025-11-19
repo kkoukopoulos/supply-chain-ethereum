@@ -35,24 +35,31 @@ contract SupplyChain {
         string memory _name,
         string memory _manufacturerName,
         string memory _barcode,
-        string memory _manufacturedTime
+        string memory _manufacturedTime,
+        uint256 _volume
     ) external {
-        products.addProduct(msg.sender, _name, _manufacturerName, _barcode, _manufacturedTime);
+        products.addProduct(msg.sender, _name, _manufacturerName, _barcode, _manufacturedTime, _volume);
     }
 
-    // NEW: Transfer product using buyer's publicKey (username)
-    function sellProductByPublicKey(string memory buyerPublicKey, string memory _barcode) external {
-        // Get buyer's address from their publicKey
+    // Sell product using buyer's public key with volume
+    function sellProductByPublicKey(
+        string memory buyerPublicKey, 
+        string memory _barcode,
+        uint256 _volume
+    ) external {
         Types.User memory buyerUser = users.getUserByPublicKey(buyerPublicKey);
         require(buyerUser.userAddress != address(0), "Buyer not found");
         
-        // Call the existing sell function with the resolved address
-        products.sell(msg.sender, buyerUser.userAddress, _barcode);
+        products.sell(msg.sender, buyerUser.userAddress, _barcode, _volume);
     }
 
-    // Keep the original function for backward compatibility
-    function sellProduct(address buyer, string memory _barcode) external {
-        products.sell(msg.sender, buyer, _barcode);
+    // Sell product using buyer's address with volume
+    function sellProduct(
+        address buyer, 
+        string memory _barcode,
+        uint256 _volume
+    ) external {
+        products.sell(msg.sender, buyer, _barcode, _volume);
     }
 
     function isUserManufacturer(address user) external view returns (bool) {
@@ -75,7 +82,6 @@ contract SupplyChain {
         return false;
     }
 
-    // NEW: Check if sale is allowed using publicKeys
     function isSaleAllowedByPublicKey(string memory sellerPublicKey, string memory buyerPublicKey) external view returns (bool) {
         Types.User memory sellerUser = users.getUserByPublicKey(sellerPublicKey);
         Types.User memory buyerUser = users.getUserByPublicKey(buyerPublicKey);
@@ -114,7 +120,18 @@ contract SupplyChain {
         return products.getUserInventoryWithDetails(userData.userAddress);
     }
 
-    // NEW FUNCTION: Get product by barcode (wrapper for Products contract function)
+    // Get total volume for a user
+    function getUserTotalVolume(address user) external view returns (uint256) {
+        return products.getUserTotalVolume(user);
+    }
+
+    // Get total volume for a user by public key
+    function getUserTotalVolumeByPublicKey(string memory publicKey) external view returns (uint256) {
+        Types.User memory userData = users.getUserByPublicKey(publicKey);
+        require(userData.userAddress != address(0), "User not found");
+        return products.getUserTotalVolume(userData.userAddress);
+    }
+
     function getProductByBarcode(string memory _barcode) external view returns (Types.Product memory) {
         return products.getProductByBarcode(_barcode);
     }
