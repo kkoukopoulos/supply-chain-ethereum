@@ -1,0 +1,29 @@
+terminal 1:
+cd blockchain
+npx hardhat compile
+npx hardhat node
+
+terminal 2:
+cd blockchain
+npx hardhat run scripts/deploy.js --network localhost
+(replace deployed supplychain address in index.html)
+
+terminal 3:
+cd observer
+npm start
+
+terminal 4:
+cd frontend
+python3 -m http.server 3000
+
+browser:
+http://localhost:3000/
+(http://localhost:3001/)
+(working cdn: "https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js")
+
+observer:
+# Check all transactions for BARCODE
+curl "http://localhost:3001/api/products/BARCODE/history"
+
+# Check manufacturer's current inventory
+curl "http://localhost:3001/api/users/MANUFACTURER_ADDRESS/inventory"

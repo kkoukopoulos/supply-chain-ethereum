@@ -758,6 +758,39 @@
             showTab('loginTab');
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////
+        // Add this to your frontend JavaScript
+        const OBSERVER_URL = "http://localhost:3001";
+
+        async function queryObserver() {
+            try {
+                // Get all users from observer
+                const usersResponse = await fetch(`${OBSERVER_URL}/api/users`);
+                const users = await usersResponse.json();
+                console.log('All registered users:', users);
+
+                // Get product history
+                const historyResponse = await fetch(`${OBSERVER_URL}/api/products/123456789/history`);
+                const history = await historyResponse.json();
+                console.log('Product history:', history);
+
+                // Get user inventory from observer
+                if (wallet && wallet.address) {
+                    const inventoryResponse = await fetch(`${OBSERVER_URL}/api/users/${wallet.address}/inventory`);
+                    const inventory = await inventoryResponse.json();
+                    console.log('My inventory from observer:', inventory);
+                }
+            } catch (error) {
+                console.error('Error querying observer:', error);
+            }
+        }
+
+        // Call this function after login
+        async function loadObserverData() {
+            await queryObserver();
+        }
+        ////////////////////////////////////////////////////////////////////////////////////
+
         // Initialize
         window.onload = function() {
             console.log("Supply Chain DApp loaded - Volume Based Version");
