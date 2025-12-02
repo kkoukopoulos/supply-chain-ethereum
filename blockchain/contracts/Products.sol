@@ -10,6 +10,9 @@ contract Products {
     mapping(address => string[]) public userProducts;
     mapping(string => bool) public productExists;
     mapping(string => Types.Product) public barcodeToProduct;
+    
+    // Track product ownership by address+barcode to handle multiple instances
+    mapping(address => mapping(string => uint256)) public userProductVolume;
 
     event NewProduct(
         address manufacturer,
@@ -64,6 +67,7 @@ contract Products {
         productExists[_barcode] = true;
 
         userProducts[_manufacturer].push(_barcode);
+        userProductVolume[_manufacturer][_barcode] = _volume;
 
         emit NewProduct(_manufacturer, _name, _manufacturerName, _barcode, _manufacturedTime, _volume);
     }
@@ -82,8 +86,9 @@ contract Products {
         require(_seller != _buyer, "Cannot sell to yourself");
         require(_volume > 0, "Volume must be greater than zero");
 
-        Types.Product storage product = barcodeToProduct[_barcode];
-        require(product.volume >= _volume, "Insufficient volume to sell");
+        // Get current seller's volume for this product
+        uint256 sellerVolume = userProductVolume[_seller][_barcode];
+        require(sellerVolume >= _volume, "Insufficient volume to sell");
 
         // Get seller and buyer roles
         Types.User memory sellerUser = users.getUser(_seller);
@@ -93,47 +98,55 @@ contract Products {
         _validateTransferPath(sellerUser.role, buyerUser.role);
 
         // Check if seller owns this product
-        bool sellerOwnsProduct = false;
-        string[] storage sellerProducts = userProducts[_seller];
-        for (uint256 i = 0; i < sellerProducts.length; i++) {
-            if (keccak256(bytes(sellerProducts[i])) == keccak256(bytes(_barcode))) {
-                sellerOwnsProduct = true;
+        require(sellerVolume > 0, "Seller does not own this product");
+
+        // Get product details before modifying anything
+        Types.Product memory originalProduct = barcodeToProduct[_barcode];
+
+        // Update seller's volume
+        userProductVolume[_seller][_barcode] = sellerVolume - _volume;
+        
+        // Update product volume in storage if seller's volume becomes 0
+        if (userProductVolume[_seller][_barcode] == 0) {
+            // Remove barcode from seller's inventory array
+            _removeBarcodeFromUser(_seller, _barcode);
+        }
+
+        // Handle buyer's side
+        uint256 buyerVolume = userProductVolume[_buyer][_barcode];
+        
+        if (buyerVolume == 0) {
+            // Buyer doesn't have this product yet, add to their inventory
+            userProducts[_buyer].push(_barcode);
+            userProductVolume[_buyer][_barcode] = _volume;
+        } else {
+            // Buyer already has this product, add volume
+            userProductVolume[_buyer][_barcode] = buyerVolume + _volume;
+        }
+
+        // Update the global product volume in barcodeToProduct mapping
+        // This should reflect the original product's volume, not the transferred portion
+        barcodeToProduct[_barcode] = Types.Product(
+            originalProduct.name,
+            originalProduct.manufacturerName,
+            originalProduct.barcode,
+            originalProduct.manufacturedTime,
+            originalProduct.volume  // Keep original manufacturer's volume
+        );
+
+        emit ProductSold(_barcode, _buyer, _seller, block.timestamp, _volume);
+    }
+
+    function _removeBarcodeFromUser(address user, string memory _barcode) internal {
+        string[] storage userBarcodes = userProducts[user];
+        
+        for (uint256 i = 0; i < userBarcodes.length; i++) {
+            if (keccak256(bytes(userBarcodes[i])) == keccak256(bytes(_barcode))) {
+                userBarcodes[i] = userBarcodes[userBarcodes.length - 1];
+                userBarcodes.pop();
                 break;
             }
         }
-        require(sellerOwnsProduct, "Seller does not own this product");
-
-        // If selling entire volume, transfer the product completely to buyer
-        if (_volume == product.volume) {
-            // Remove from seller
-            for (uint256 i = 0; i < sellerProducts.length; i++) {
-                if (keccak256(bytes(sellerProducts[i])) == keccak256(bytes(_barcode))) {
-                    sellerProducts[i] = sellerProducts[sellerProducts.length - 1];
-                    sellerProducts.pop();
-                    break;
-                }
-            }
-            
-            // Add to buyer
-            userProducts[_buyer].push(_barcode);
-        } else {
-            // Partial transfer - reduce seller's volume
-            product.volume -= _volume;
-            
-            // Create new product entry for buyer with the transferred volume
-            Types.Product memory newProduct = Types.Product(
-                product.name,
-                product.manufacturerName,
-                _barcode,
-                product.manufacturedTime,
-                _volume
-            );
-            
-            products.push(newProduct);
-            userProducts[_buyer].push(_barcode);
-        }
-
-        emit ProductSold(_barcode, _buyer, _seller, block.timestamp, _volume);
     }
 
     function _validateTransferPath(Types.UserRole sellerRole, Types.UserRole buyerRole) internal pure {
@@ -162,10 +175,14 @@ contract Products {
         uint256 totalVolume = 0;
         
         for (uint i = 0; i < barcodes.length; i++) {
-            totalVolume += barcodeToProduct[barcodes[i]].volume;
+            totalVolume += userProductVolume[user][barcodes[i]];
         }
         
         return totalVolume;
+    }
+
+    function getProductVolume(address user, string memory _barcode) public view returns (uint256) {
+        return userProductVolume[user][_barcode];
     }
 
     function isUserManufacturer(address user) public view returns (bool) {
@@ -182,7 +199,16 @@ contract Products {
         Types.Product[] memory inventory = new Types.Product[](barcodes.length);
         
         for (uint i = 0; i < barcodes.length; i++) {
-            inventory[i] = barcodeToProduct[barcodes[i]];
+            Types.Product memory baseProduct = barcodeToProduct[barcodes[i]];
+            uint256 userVolume = userProductVolume[user][barcodes[i]];
+            
+            inventory[i] = Types.Product(
+                baseProduct.name,
+                baseProduct.manufacturerName,
+                baseProduct.barcode,
+                baseProduct.manufacturedTime,
+                userVolume  // Use the user's specific volume
+            );
         }
         
         return inventory;

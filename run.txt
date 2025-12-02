@@ -11,6 +11,7 @@ npx hardhat run scripts/deploy.js --network localhost
 terminal 3:
 cd observer
 npm start
+(clear observer data: rm -f observer.db)
 
 terminal 4:
 cd frontend
@@ -18,7 +19,7 @@ python3 -m http.server 3000
 
 browser:
 http://localhost:3000/
-(http://localhost:3001/)
+http://localhost:3001/
 (working cdn: "https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js")
 
 observer:

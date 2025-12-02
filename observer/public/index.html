@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Supply Chain Observer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        
+        .container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .panel {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+            flex: 1;
+            min-width: 300px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        h2 {
+            color: #4CAF50;
+            margin-top: 0;
+        }
+        
+        input, button {
+            padding: 8px 12px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+        
+        .status {
+            background: #e8f5e8;
+            padding: 10px;
+            border-radius: 3px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        
+        .user-list, .inventory-list, .transaction-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            border-radius: 3px;
+            padding: 10px;
+        }
+        
+        .user-item, .inventory-item, .transaction-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        
+        .user-item:hover, .inventory-item:hover {
+            background: #f9f9f9;
+        }
+        
+        .role-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        
+        .manufacturer { background: #e3f2fd; color: #1976d2; }
+        .supplier { background: #e8f5e9; color: #388e3c; }
+        .vendor { background: #fff3e0; color: #f57c00; }
+        .customer { background: #f3e5f5; color: #7b1fa2; }
+        
+        .volume {
+            float: right;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <h1>Supply Chain Observer</h1>
+    
+    <div class="status" id="status">Loading...</div>
+    
+    <div class="container">
+        <!-- Users Panel -->
+        <div class="panel">
+            <h2>👥 Registered Users</h2>
+            <input type="text" id="searchUsers" placeholder="Search users...">
+            <div class="user-list" id="userList">
+                Loading users...
+            </div>
+        </div>
+        
+        <!-- User Inventory Panel -->
+        <div class="panel">
+            <h2>📦 User Inventory</h2>
+            <div id="selectedUserInfo" style="margin-bottom: 15px; display: none;">
+                <strong>Viewing inventory for:</strong>
+                <span id="selectedUserName"></span>
+                <span id="selectedUserRole" class="role-badge"></span>
+            </div>
+            <div class="inventory-list" id="inventoryList">
+                Select a user to view their inventory
+            </div>
+        </div>
+        
+        <!-- Product Search Panel -->
+        <div class="panel">
+            <h2>🔍 Product History</h2>
+            <input type="text" id="searchBarcode" placeholder="Enter product barcode...">
+            <button onclick="searchProduct()">Search Product</button>
+            <div class="transaction-list" id="productHistory">
+                Enter a barcode to view product history
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const OBSERVER_URL = 'http://localhost:3001/api';
+        let allUsers = [];
+        let selectedUser = null;
+        
+        // Initialize the observer
+        async function init() {
+            try {
+                // Check connection
+                const health = await fetch(`${OBSERVER_URL}/health`);
+                if (health.ok) {
+                    document.getElementById('status').textContent = '✅ Connected to observer';
+                    document.getElementById('status').style.background = '#e8f5e8';
+                } else {
+                    document.getElementById('status').textContent = '❌ Cannot connect to observer';
+                    document.getElementById('status').style.background = '#ffebee';
+                    return;
+                }
+                
+                // Load users
+                await loadUsers();
+                
+                // Setup search
+                document.getElementById('searchUsers').addEventListener('input', searchUsers);
+                
+                // Auto-refresh every 30 seconds
+                setInterval(async () => {
+                    await loadUsers();
+                    if (selectedUser) {
+                        await loadUserInventory(selectedUser.address);
+                    }
+                }, 30000);
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                document.getElementById('status').textContent = '❌ Error loading data';
+                document.getElementById('status').style.background = '#ffebee';
+            }
+        }
+        
+        // Load all users
+        async function loadUsers() {
+            try {
+                const response = await fetch(`${OBSERVER_URL}/users`);
+                allUsers = await response.json();
+                renderUsers(allUsers);
+            } catch (error) {
+                console.error('Error loading users:', error);
+                document.getElementById('userList').innerHTML = 'Error loading users';
+            }
+        }
+        
+        // Render users list
+        function renderUsers(users) {
+            const userList = document.getElementById('userList');
+            
+            if (!users || users.length === 0) {
+                userList.innerHTML = 'No users found';
+                return;
+            }
+            
+            let html = '';
+            users.forEach(user => {
+                const roleClass = getRoleClass(user.role);
+                const roleName = getRoleName(user.role);
+                const shortAddress = shortenAddress(user.address);
+                
+                html += `
+                    <div class="user-item" onclick="selectUser('${user.address}')">
+                        <strong>${user.name}</strong>
+                        <span class="role-badge ${roleClass}">${roleName}</span>
+                        <div style="font-size: 12px; color: #666;">${shortAddress}</div>
+                    </div>
+                `;
+            });
+            
+            userList.innerHTML = html;
+        }
+        
+        // Search users
+        function searchUsers() {
+            const searchTerm = document.getElementById('searchUsers').value.toLowerCase();
+            const filteredUsers = allUsers.filter(user => 
+                user.name.toLowerCase().includes(searchTerm) ||
+                user.address.toLowerCase().includes(searchTerm) ||
+                user.public_key.toLowerCase().includes(searchTerm)
+            );
+            
+            const userList = document.getElementById('userList');
+            
+            if (filteredUsers.length === 0) {
+                userList.innerHTML = 'No users match your search';
+                return;
+            }
+            
+            let html = '';
+            filteredUsers.forEach(user => {
+                const roleClass = getRoleClass(user.role);
+                const roleName = getRoleName(user.role);
+                const shortAddress = shortenAddress(user.address);
+                
+                html += `
+                    <div class="user-item" onclick="selectUser('${user.address}')">
+                        <strong>${user.name}</strong>
+                        <span class="role-badge ${roleClass}">${roleName}</span>
+                        <div style="font-size: 12px; color: #666;">${shortAddress}</div>
+                    </div>
+                `;
+            });
+            
+            userList.innerHTML = html;
+        }
+        
+        // Select a user and load their inventory
+        async function selectUser(address) {
+            const user = allUsers.find(u => u.address === address);
+            if (!user) return;
+            
+            selectedUser = user;
+            
+            // Update selected user info
+            document.getElementById('selectedUserInfo').style.display = 'block';
+            document.getElementById('selectedUserName').textContent = user.name;
+            document.getElementById('selectedUserRole').textContent = getRoleName(user.role);
+            document.getElementById('selectedUserRole').className = `role-badge ${getRoleClass(user.role)}`;
+            
+            // Load inventory
+            await loadUserInventory(address);
+        }
+        
+        // Load user inventory
+        async function loadUserInventory(address) {
+            try {
+                const response = await fetch(`${OBSERVER_URL}/users/${address}/inventory`);
+                const inventory = await response.json();
+                renderInventory(inventory);
+            } catch (error) {
+                console.error('Error loading inventory:', error);
+                document.getElementById('inventoryList').innerHTML = 'Error loading inventory';
+            }
+        }
+        
+        // Render inventory
+        function renderInventory(inventory) {
+            const inventoryList = document.getElementById('inventoryList');
+            
+            if (!inventory || inventory.length === 0) {
+                inventoryList.innerHTML = 'No products in inventory';
+                return;
+            }
+            
+            let html = '';
+            inventory.forEach(item => {
+                html += `
+                    <div class="inventory-item" onclick="viewProductHistory('${item.barcode}')">
+                        <strong>${item.name}</strong>
+                        <span class="volume">${item.volume}</span>
+                        <div style="font-size: 12px; color: #666;">
+                            Barcode: ${item.barcode}<br>
+                            Manufacturer: ${item.manufacturerName}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            inventoryList.innerHTML = html;
+        }
+        
+        // Search product history
+        async function searchProduct() {
+            const barcode = document.getElementById('searchBarcode').value.trim();
+            if (!barcode) return;
+            
+            await viewProductHistory(barcode);
+        }
+        
+        // View product history
+        async function viewProductHistory(barcode) {
+            try {
+                const response = await fetch(`${OBSERVER_URL}/products/${barcode}/history`);
+                const history = await response.json();
+                renderProductHistory(barcode, history);
+            } catch (error) {
+                console.error('Error loading product history:', error);
+                document.getElementById('productHistory').innerHTML = 'Error loading product history';
+            }
+        }
+        
+        // Render product history
+        function renderProductHistory(barcode, history) {
+            const productHistory = document.getElementById('productHistory');
+            
+            if (!history || history.length === 0) {
+                productHistory.innerHTML = `No history found for product: ${barcode}`;
+                return;
+            }
+            
+            let html = `<h3>History for: ${barcode}</h3>`;
+            
+            history.forEach(tx => {
+                const timestamp = new Date(tx.timestamp * 1000).toLocaleString();
+                const fromName = getUserName(tx.from_address);
+                const toName = getUserName(tx.to_address);
+                
+                html += `
+                    <div class="transaction-item">
+                        <strong>${tx.event_type}</strong>
+                        <div style="font-size: 14px; color: #666;">
+                            From: ${fromName || shortenAddress(tx.from_address)}<br>
+                            To: ${toName || shortenAddress(tx.to_address)}<br>
+                            Volume: ${tx.volume}<br>
+                            Time: ${timestamp}<br>
+                            Block: ${tx.block_number}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            productHistory.innerHTML = html;
+        }
+        
+        // Helper: Get user name from address
+        function getUserName(address) {
+            if (!address) return '';
+            const user = allUsers.find(u => u.address === address);
+            return user ? user.name : '';
+        }
+        
+        // Helper: Get role class
+        function getRoleClass(role) {
+            const classes = ['manufacturer', 'supplier', 'vendor', 'customer'];
+            return classes[role] || '';
+        }
+        
+        // Helper: Get role name
+        function getRoleName(role) {
+            const names = ['Manufacturer', 'Supplier', 'Vendor', 'Customer'];
+            return names[role] || 'Unknown';
+        }
+        
+        // Helper: Shorten address
+        function shortenAddress(address, chars = 6) {
+            if (!address) return '';
+            if (address.length <= chars * 2 + 2) return address;
+            return `${address.substring(0, chars)}...${address.substring(address.length - chars)}`;
+        }
+        
+        // Initialize on load
+        window.onload = init;
+    </script>
+</body>
+</html>

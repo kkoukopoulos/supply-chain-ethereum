@@ -1,7 +1,6 @@
 import { ethers } from 'ethers';
 import { config } from './config.js';
 
-// Contract ABIs for event parsing
 const SupplyChainABI = [
   "event NewProduct(address manufacturer, string name, string manufacturerName, string barcode, string manufacturedTime, uint256 volume)",
   "event ProductSold(string barcode, address buyer, address seller, uint256 transferTime, uint256 volume)"
@@ -20,18 +19,13 @@ export class EventProcessor {
 
   async processLog(log, block, tx) {
     try {
-      // Skip if no address or not our contract (optional filter)
-      if (!log.address) {
-        return;
-      }
-
       // Try to parse as SupplyChain event
       try {
         const parsedLog = this.supplyChainInterface.parseLog(log);
         await this.handleSupplyChainEvent(parsedLog, block, tx);
         return;
       } catch (e) {
-        // Not a SupplyChain event, continue to next parser
+        // Not a SupplyChain event
       }
 
       // Try to parse as Users event
@@ -99,16 +93,24 @@ export class EventProcessor {
 
   async handleNewProduct(args, block, tx) {
     try {
-      const product = {
+      // Add product to products table
+      await this.db.addProduct({
         barcode: args.barcode,
         name: args.name,
         manufacturerName: args.manufacturerName,
-        manufacturedTime: args.manufacturedTime,
-        volume: args.volume.toString(),
-        currentOwner: args.manufacturer
-      };
+        manufacturedTime: args.manufacturedTime
+      }, block.number, tx.hash);
 
-      await this.db.addProduct(product, block.number, tx.hash);
+      // Add initial inventory for manufacturer
+      await this.db.updateUserInventory(
+        args.manufacturer,
+        args.barcode,
+        args.volume.toString(),
+        block.number,
+        tx.hash
+      );
+
+      // Add transaction record
       await this.db.addTransaction(
         'NewProduct',
         args.barcode,
@@ -120,7 +122,7 @@ export class EventProcessor {
         block.timestamp
       );
 
-      console.log(`New product registered: ${product.name} (${product.barcode})`);
+      console.log(`New product registered: ${args.name} (${args.barcode}) - Volume: ${args.volume} owned by ${args.manufacturer}`);
     } catch (error) {
       console.error('Error handling NewProduct event:', error.message);
     }
@@ -128,6 +130,17 @@ export class EventProcessor {
 
   async handleProductSold(args, block, tx) {
     try {
+      // First, get current volumes
+      // In a real implementation, we'd query the blockchain for current state
+      // For now, we'll track it in our database as we process events in order
+      
+      // Update seller's inventory (reduce volume)
+      await this.updateSellerInventory(args.seller, args.barcode, args.volume, block, tx);
+      
+      // Update buyer's inventory (add volume)
+      await this.updateBuyerInventory(args.buyer, args.barcode, args.volume, block, tx);
+
+      // Add transaction record
       await this.db.addTransaction(
         'ProductSold',
         args.barcode,
@@ -139,9 +152,86 @@ export class EventProcessor {
         block.timestamp
       );
 
-      console.log(`Product sold: ${args.barcode} from ${args.seller} to ${args.buyer}, volume: ${args.volume}`);
+      console.log(`Product sold: ${args.barcode} - ${args.volume} units from ${args.seller} to ${args.buyer}`);
     } catch (error) {
       console.error('Error handling ProductSold event:', error.message);
     }
+  }
+
+  async updateSellerInventory(seller, barcode, volumeToSell, block, tx) {
+    try {
+      // Get current seller inventory
+      const sellerInventory = await this.db.getUserInventory(seller);
+      const product = sellerInventory.find(item => item.barcode === barcode);
+      
+      if (product) {
+        const currentVolume = parseInt(product.volume);
+        const newVolume = currentVolume - parseInt(volumeToSell);
+        
+        if (newVolume > 0) {
+          // Update seller's inventory with reduced volume
+          await this.db.updateUserInventory(
+            seller,
+            barcode,
+            newVolume,
+            block.number,
+            tx.hash
+          );
+        } else {
+          // Remove from seller's inventory if volume becomes 0
+          await this.db.removeUserInventory(seller, barcode);
+        }
+      }
+    } catch (error) {
+      console.error(`Error updating seller inventory for ${seller}:`, error.message);
+    }
+  }
+
+  async updateBuyerInventory(buyer, barcode, volumeToBuy, block, tx) {
+    try {
+      // Get current buyer inventory
+      const buyerInventory = await this.db.getUserInventory(buyer);
+      const product = buyerInventory.find(item => item.barcode === barcode);
+      
+      if (product) {
+        // Buyer already has this product, add to existing volume
+        const currentVolume = parseInt(product.volume);
+        const newVolume = currentVolume + parseInt(volumeToBuy);
+        
+        await this.db.updateUserInventory(
+          buyer,
+          barcode,
+          newVolume,
+          block.number,
+          tx.hash
+        );
+      } else {
+        // Buyer doesn't have this product yet
+        await this.db.updateUserInventory(
+          buyer,
+          barcode,
+          parseInt(volumeToBuy),
+          block.number,
+          tx.hash
+        );
+      }
+    } catch (error) {
+      console.error(`Error updating buyer inventory for ${buyer}:`, error.message);
+    }
+  }
+
+  // Helper method to get current inventory (needs to be implemented in db)
+  async getCurrentUserInventory(userAddress, barcode) {
+    // This is a simplified version - in reality we'd query the db
+    return new Promise((resolve, reject) => {
+      this.db.get(
+        "SELECT * FROM user_inventory WHERE user_address = ? AND barcode = ?",
+        [userAddress, barcode],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        }
+      );
+    });
   }
 }

@@ -10,7 +10,16 @@ export class QueryEngine {
   }
 
   async getUserInventory(userAddress, blockNumber = null) {
-    return await this.db.getUserInventory(userAddress, blockNumber);
+    const inventory = await this.db.getUserInventory(userAddress, blockNumber);
+    
+    // Transform to match expected format
+    return inventory.map(item => ({
+      name: item.name,
+      manufacturerName: item.manufacturer_name,
+      barcode: item.barcode,
+      manufacturedTime: item.manufactured_time,
+      volume: item.volume || 0
+    }));
   }
 
   async getProductHistory(barcode) {
@@ -22,26 +31,39 @@ export class QueryEngine {
   }
 
   async getProductAuditTrail(barcode) {
-    const product = await this.db.getProduct(barcode);
-    const transactions = await this.db.getProductHistory(barcode);
+    const audit = await this.db.getProductAuditTrail(barcode);
     
+    // Transform to match expected format
     return {
-      product,
-      transactionHistory: transactions,
-      currentOwner: product?.currentOwner,
-      totalTransactions: transactions.length
+      product: {
+        barcode: audit.product?.barcode,
+        name: audit.product?.name,
+        manufacturerName: audit.product?.manufacturer_name,
+        manufacturedTime: audit.product?.manufactured_time,
+        volume: audit.currentHolders?.reduce((total, holder) => total + (holder.volume || 0), 0) || 0
+      },
+      transactionHistory: audit.transactionHistory,
+      currentHolders: audit.currentHolders,
+      totalTransactions: audit.totalTransactions
     };
   }
 
   async getSupplyChainStats() {
-    // Implementation for overall statistics
     const users = await this.getAllUsers();
     const transactions = await this.db.getAllTransactions();
+    
+    // Calculate total inventory volume across all users
+    let totalInventoryVolume = 0;
+    for (const user of users) {
+      const inventory = await this.getUserInventory(user.address);
+      totalInventoryVolume += inventory.reduce((sum, item) => sum + (item.volume || 0), 0);
+    }
     
     return {
       totalUsers: users.length,
       totalTransactions: transactions.length,
       totalProducts: await this.db.getTotalProducts(),
+      totalInventoryVolume: totalInventoryVolume,
       activeUsers: users.filter(u => u.last_updated_block > 0).length
     };
   }

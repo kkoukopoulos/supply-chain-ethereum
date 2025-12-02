@@ -3,10 +3,18 @@ import cors from 'cors';
 import { BlockchainScanner } from './blockchain-scanner.js';
 import { QueryEngine } from './query-engine.js';
 import { config } from './config.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Serve static files from public directory
+app.use(express.static(path.join(__dirname, 'public')));
 
 const scanner = new BlockchainScanner();
 const queryEngine = new QueryEngine();
@@ -24,6 +32,16 @@ async function initialize() {
 // API Routes
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: Date.now() });
+});
+
+app.get('/api/stats', async (req, res) => {
+  try {
+    const stats = await queryEngine.getSupplyChainStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('Error getting stats:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.get('/api/users', async (req, res) => {
@@ -82,7 +100,60 @@ app.get('/api/audit/product/:barcode', async (req, res) => {
   }
 });
 
+// NEW: Get all transactions (with optional limit)
+app.get('/api/transactions', async (req, res) => {
+  try {
+    const { limit } = req.query;
+    
+    // Since queryEngine doesn't have getAllTransactions, use the database directly
+    const db = queryEngine.db; // Access the db instance from queryEngine
+    
+    if (!db || !db.getAllTransactions) {
+      return res.status(500).json({ error: 'Database not available' });
+    }
+    
+    const transactions = await db.getAllTransactions();
+    
+    // Apply limit if specified
+    let result = transactions;
+    if (limit) {
+      const limitNum = parseInt(limit);
+      if (!isNaN(limitNum) && limitNum > 0) {
+        result = transactions.slice(-limitNum);
+      }
+    }
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching transactions:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// NEW: Get all products
+app.get('/api/products', async (req, res) => {
+  try {
+    const db = queryEngine.db; // Access the db instance from queryEngine
+    
+    if (!db || !db.getAllProducts) {
+      return res.status(500).json({ error: 'Database not available' });
+    }
+    
+    const products = await db.getAllProducts();
+    res.json(products);
+  } catch (error) {
+    console.error('Error fetching products:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Serve dashboard on root route
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 app.listen(config.server.port, () => {
   console.log(`Observer service running on port ${config.server.port}`);
+  console.log(`Dashboard available at: http://localhost:${config.server.port}`);
   initialize();
 });

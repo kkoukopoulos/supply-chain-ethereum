@@ -2,3 +2,4 @@ blockchain/node_modules
 observer/node_modules
 blockchain/artifacts
 blockchain/cache
+observer/observer.db
