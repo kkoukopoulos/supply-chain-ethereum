@@ -113,7 +113,7 @@
     <div class="container">
         <!-- Users Panel -->
         <div class="panel">
-            <h2>👥 Registered Users</h2>
+            <h2>Registered Users</h2>
             <input type="text" id="searchUsers" placeholder="Search users...">
             <div class="user-list" id="userList">
                 Loading users...
@@ -122,7 +122,7 @@
         
         <!-- User Inventory Panel -->
         <div class="panel">
-            <h2>📦 User Inventory</h2>
+            <h2>User Inventory</h2>
             <div id="selectedUserInfo" style="margin-bottom: 15px; display: none;">
                 <strong>Viewing inventory for:</strong>
                 <span id="selectedUserName"></span>
@@ -135,7 +135,7 @@
         
         <!-- Product Search Panel -->
         <div class="panel">
-            <h2>🔍 Product History</h2>
+            <h2>Product History</h2>
             <input type="text" id="searchBarcode" placeholder="Enter product barcode...">
             <button onclick="searchProduct()">Search Product</button>
             <div class="transaction-list" id="productHistory">
@@ -155,10 +155,10 @@
                 // Check connection
                 const health = await fetch(`${OBSERVER_URL}/health`);
                 if (health.ok) {
-                    document.getElementById('status').textContent = '✅ Connected to observer';
+                    document.getElementById('status').textContent = 'Connected to observer';
                     document.getElementById('status').style.background = '#e8f5e8';
                 } else {
-                    document.getElementById('status').textContent = '❌ Cannot connect to observer';
+                    document.getElementById('status').textContent = 'Cannot connect to observer';
                     document.getElementById('status').style.background = '#ffebee';
                     return;
                 }

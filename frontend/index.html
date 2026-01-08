@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Supply Chain DApp - Volume Based</title>
+    <title>Supply Chain DApp</title>
     <script src="https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
@@ -19,12 +19,7 @@
     </style>
 </head>
 <body>
-    <h1>Supply Chain Management - Volume Based</h1>
-
-    <div class="warning">
-        <strong>Volume-Based Supply Chain</strong><br>
-        All product transfers now require specifying volume amount!
-    </div>
+    <h1>Supply Chain Management</h1>
 
     <!-- Navigation -->
     <div style="margin-bottom: 20px;">
@@ -594,9 +589,59 @@
                 loadMyInventory();
 
             } catch (error) {
+                //console.error('Transfer error:', error);
+                //document.getElementById('transferResult').innerHTML = 
+                    //'<span class="error">Transfer failed: ' + error.message + '</span>';
+                //document.getElementById('transferStatus').innerHTML = '';
+                
                 console.error('Transfer error:', error);
+    
+                let errorMessage = 'Transfer failed';
+                
+                // Try to extract the actual error message from the ethers error
+                if (error.message) {
+                    if (error.message.includes('Insufficient volume to sell')) {
+                        errorMessage = 'Transfer failed: Insufficient volume';
+                    } else if (error.message.includes('Manufacturer can only sell to Supplier')) {
+                        errorMessage = 'Transfer failed: Manufacturer can only sell to Supplier';
+                    } else if (error.message.includes('Supplier can only sell to Vendor')) {
+                        errorMessage = 'Transfer failed: Supplier can only sell to Vendor';
+                    } else if (error.message.includes('Vendor can only sell to Customer')) {
+                        errorMessage = 'Transfer failed: Vendor can only sell to Customer';
+                    } else if (error.message.includes('Customer cannot sell the product')) {
+                        errorMessage = 'Transfer failed: Customer cannot sell the product';
+                    } else if (error.message.includes('Seller does not own this product')) {
+                        errorMessage = 'Transfer failed: Seller does not own this product';
+                    } else if (error.message.includes('cannot estimate gas')) {
+                        // Try to parse the nested error
+                        try {
+                            if (error.error && error.error.body) {
+                                const body = JSON.parse(error.error.body);
+                                if (body.error && body.error.message) {
+                                    const nestedError = body.error.message;
+                                    if (nestedError.includes('Insufficient volume to sell')) {
+                                        errorMessage = 'Transfer failed: Insufficient volume';
+                                    } else if (nestedError.includes('Manufacturer can only sell to Supplier')) {
+                                        errorMessage = 'Transfer failed: Manufacturer can only sell to Supplier';
+                                    } else if (nestedError.includes('Supplier can only sell to Vendor')) {
+                                        errorMessage = 'Transfer failed: Supplier can only sell to Vendor';
+                                    } else if (nestedError.includes('Vendor can only sell to Customer')) {
+                                        errorMessage = 'Transfer failed: Vendor can only sell to Customer';
+                                    } else {
+                                        errorMessage = 'Transfer failed: Transaction would fail';
+                                    }
+                                }
+                            }
+                        } catch (parseError) {
+                            errorMessage = 'Transfer failed: Transaction would fail';
+                        }
+                    } else {
+                        errorMessage = 'Transfer failed: ' + error.message;
+                    }
+                }
+                
                 document.getElementById('transferResult').innerHTML = 
-                    '<span class="error">Transfer failed: ' + error.message + '</span>';
+                    '<span class="error">' + errorMessage + '</span>';
                 document.getElementById('transferStatus').innerHTML = '';
             }
         }
@@ -792,7 +837,7 @@
 
         // Initialize
         window.onload = function() {
-            console.log("Supply Chain DApp loaded - Volume Based Version");
+            console.log("Supply Chain DApp loaded");
         };
     </script>
 </body>
