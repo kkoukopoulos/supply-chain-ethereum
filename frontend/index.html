@@ -32,9 +32,9 @@
     <div id="registerTab" class="tab active">
         <div class="section">
             <h2>Register New User</h2>
-            <input type="text" id="regUsername" placeholder="Choose your username (e.g., john_doe, acme_corp)">
-            <input type="password" id="regPassword" placeholder="Set password (for local security)">
-            <input type="text" id="regName" placeholder="Your full name or company name">
+            <input type="text" id="regUsername" placeholder="Username">
+            <input type="password" id="regPassword" placeholder="Password">
+            <input type="text" id="regName" placeholder="Full Name or Company Name">
             <select id="regRole">
                 <option value="0">Manufacturer</option>
                 <option value="1">Supplier</option>
@@ -50,9 +50,9 @@
     <!-- Login Tab -->
     <div id="loginTab" class="tab">
         <div class="section">
-            <h2>Login with Username</h2>
-            <input type="text" id="loginUsername" placeholder="Your username">
-            <input type="password" id="loginPassword" placeholder="Your password">
+            <h2>Login Existing User</h2>
+            <input type="text" id="loginUsername" placeholder="Username">
+            <input type="password" id="loginPassword" placeholder="Password">
             <button onclick="loginUser()">Login</button>
             <div id="loginResult"></div>
         </div>
@@ -186,19 +186,19 @@
             const role = document.getElementById('regRole').value;
 
             if (!username) {
-                alert("Please choose a username!");
+                alert("Please choose a username.");
                 return;
             }
             if (!password) {
-                alert("Please set a password!");
+                alert("Please set a password.");
                 return;
             }
             if (!name) {
-                alert("Please enter your name!");
+                alert("Please enter your name.");
                 return;
             }
             if (username.length < 3) {
-                alert("Username must be at least 3 characters long!");
+                alert("Username must be at least 3 characters long.");
                 return;
             }
 
@@ -237,7 +237,7 @@
                 localStorage.setItem('password_' + username, btoa(password));
 
                 document.getElementById('regResult').innerHTML = 
-                    '<span class="success">Registration successful! You can now login.</span>';
+                    '<span class="success">Registration successful. You can now login.</span>';
 
                 document.getElementById('regUsername').value = '';
                 document.getElementById('regPassword').value = '';
@@ -248,7 +248,7 @@
                 let errorMessage = error.message;
                 
                 if (errorMessage.includes("Public key already registered")) {
-                    errorMessage = "Username already taken! Please choose a different username.";
+                    errorMessage = "Username already taken. Please choose a different username.";
                 } else if (errorMessage.includes("user rejected transaction")) {
                     errorMessage = "Transaction was rejected.";
                 } else if (errorMessage.includes("insufficient funds")) {
@@ -308,7 +308,7 @@
                 document.getElementById('checkSeller').value = username;
                 
                 document.getElementById('loginResult').innerHTML = 
-                    '<span class="success">Login successful!</span>';
+                    '<span class="success">Login successful.</span>';
                 
                 document.getElementById('appTabBtn').style.display = 'inline-block';
                 showTab('appTab');
@@ -328,7 +328,7 @@
         // Load current user's inventory
         async function loadMyInventory() {
             if (!contract || !currentUser) {
-                alert("Please login first!");
+                alert("Please login first.");
                 return;
             }
 
@@ -339,7 +339,7 @@
                 
                 if (inventory.length === 0) {
                     document.getElementById('myInventory').innerHTML = 
-                        '<div class="info-box">Your inventory is empty. Register some products to get started!</div>';
+                        '<div class="info-box">Your inventory is empty.</div>';
                     return;
                 }
 
@@ -368,7 +368,7 @@
         // Load current user's inventory with details
         async function loadMyInventoryWithDetails() {
             if (!contract || !currentUser) {
-                alert("Please login first!");
+                alert("Please login first.");
                 return;
             }
 
@@ -413,7 +413,7 @@
         // Lookup user inventory by username
         async function lookupUserInventory() {
             if (!contract) {
-                alert("Please login first!");
+                alert("Please login first.");
                 return;
             }
 
@@ -460,7 +460,7 @@
         // Lookup user inventory with details by username
         async function lookupUserInventoryWithDetails() {
             if (!contract) {
-                alert("Please login first!");
+                alert("Please login first.");
                 return;
             }
 
@@ -512,7 +512,7 @@
         // Helper function: Lookup product by barcode and display in product info section
         async function lookupProductByBarcode(barcode) {
             if (!contract) {
-                alert("Please login first!");
+                alert("Please login first.");
                 return;
             }
 
@@ -539,7 +539,7 @@
         // Transfer product using buyer's username with volume
         async function transferProductByUsername() {
             if (!contract) {
-                alert("Please login first!");
+                alert("Please login first.");
                 return;
             }
 
@@ -569,7 +569,7 @@
                     throw new Error(`Transfer not allowed: ${getRoleName(currentUser.role)} cannot sell to ${getRoleName(buyerUser.role)}`);
                 }
 
-                document.getElementById('transferStatus').innerHTML += "<br>Transfer allowed!";
+                document.getElementById('transferStatus').innerHTML += "<br>Transfer allowed.";
 
                 // Execute the transfer using username with volume
                 document.getElementById('transferStatus').innerHTML += "<br>Executing transfer...";
@@ -578,7 +578,7 @@
 
                 document.getElementById('transferResult').innerHTML = 
                     '<span class="success">Product transferred successfully to ' + buyerUsername + '!</span>';
-                document.getElementById('transferStatus').innerHTML += "<br>Transfer completed!";
+                document.getElementById('transferStatus').innerHTML += "<br>Transfer completed.";
                 
                 // Clear form
                 document.getElementById('transferBarcode').value = '';
@@ -693,7 +693,7 @@
         // Product registration with volume
         async function registerProduct() {
             if (!contract) {
-                alert("Please login first!");
+                alert("Please login first.");
                 return;
             }
 
@@ -712,7 +712,7 @@
                 const tx = await contract.registerProduct(name, manufacturerName, barcode, manufacturedTime, volume);
                 await tx.wait();
                 document.getElementById('productResult').innerHTML = 
-                    '<span class="success">Product registered successfully!</span>';
+                    '<span class="success">Product registered successfully.</span>';
                 
                 // Clear form
                 document.getElementById('productName').value = '';
@@ -733,7 +733,7 @@
         // Product lookup
         async function lookupProduct() {
             if (!contract) {
-                alert("Please login first!");
+                alert("Please login first.");
                 return;
             }
 
@@ -760,7 +760,7 @@
         // User lookup by username
         async function lookupUser() {
             if (!contract) {
-                alert("Please login first!");
+                alert("Please login first.");
                 return;
             }
 
